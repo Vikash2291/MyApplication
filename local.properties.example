@@ -1,0 +1,14 @@
+# Local configuration - COPY TO local.properties AND EDIT
+# This file is gitignored - each developer creates their own
+
+# Android SDK location (REQUIRED)
+sdk.dir=/home/yourusername/Android/Sdk
+
+# Optional: NDK path if using native code
+# ndk.dir=/home/yourusername/Android/Sdk/ndk/25.2.9519653
+
+# Optional: Custom Maven repositories
+# maven.url=https://your-private-repo.com/maven
+
+# Optional: Build cache directory
+# build.cache.dir=/path/to/custom/cache
