@@ -12,14 +12,19 @@ import com.example.myapplication.data.auth.FirebaseAuthDataSource
 import com.example.myapplication.data.device.AndroidDeviceInfoProvider
 import com.example.myapplication.data.device.DeviceInfoProvider
 import com.example.myapplication.data.local.database.AppDatabase
+import com.example.myapplication.data.local.database.dao.QuizDao
 import com.example.myapplication.data.local.database.dao.SettingsDao
 import com.example.myapplication.data.local.database.dao.UserDao
 import com.example.myapplication.data.local.preferences.PreferencesRepository
 import com.example.myapplication.data.local.preferences.PreferencesRepositoryImpl
+import com.example.myapplication.data.quiz.AssetQuestionBankSource
+import com.example.myapplication.data.quiz.QuestionBankSource
+import com.example.myapplication.data.quiz.QuizRepositoryImpl
 import com.example.myapplication.data.remote.ApiService
 import com.example.myapplication.data.remote.AuthInterceptor
 import com.example.myapplication.data.repository.AuthRepositoryImpl
 import com.example.myapplication.data.repository.UserRepositoryImpl
+import com.example.myapplication.domain.quiz.QuizRepository
 import com.example.myapplication.domain.repository.AuthRepository
 import com.example.myapplication.domain.repository.UserRepository
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -53,6 +58,9 @@ object AppModule {
 
     @Provides
     fun provideSettingsDao(db: AppDatabase): SettingsDao = db.settingsDao()
+
+    @Provides
+    fun provideQuizDao(db: AppDatabase): QuizDao = db.quizDao()
 
     @Provides
     @Singleton
@@ -132,4 +140,12 @@ abstract class BindingsModule {
     @Binds
     @Singleton
     abstract fun bindAdsManager(impl: AdsManagerImpl): AdsManager
+
+    @Binds
+    @Singleton
+    abstract fun bindQuizRepository(impl: QuizRepositoryImpl): QuizRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindQuestionBankSource(impl: AssetQuestionBankSource): QuestionBankSource
 }

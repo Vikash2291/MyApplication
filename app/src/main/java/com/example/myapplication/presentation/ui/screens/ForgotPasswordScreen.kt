@@ -1,5 +1,7 @@
 package com.example.myapplication.presentation.ui.screens
 
+import com.example.myapplication.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,7 +36,7 @@ fun ForgotPasswordScreen(
 ) {
     var email by rememberSaveable { mutableStateOf("") }
 
-    Scaffold(topBar = { AppTopBar(title = "Reset password", onNavigateUp = onBackClick) }) { padding ->
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.forgot_title), onNavigateUp = onBackClick) }) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -42,7 +44,7 @@ fun ForgotPasswordScreen(
                 .padding(24.dp)
         ) {
             Text(
-                "Enter the email you signed up with and we'll send you a link to reset your password.",
+                stringResource(R.string.forgot_body),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -50,7 +52,7 @@ fun ForgotPasswordScreen(
             AppTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = "Email",
+                label = stringResource(R.string.field_email),
                 leadingIcon = Icons.Default.Email,
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Done,
@@ -59,7 +61,7 @@ fun ForgotPasswordScreen(
             Spacer(Modifier.height(16.dp))
             ErrorText(uiState.error, Modifier.padding(bottom = 8.dp))
             PrimaryButton(
-                text = "Send reset link",
+                text = stringResource(R.string.forgot_send),
                 onClick = { onResetClick(email) },
                 loading = uiState.isLoading,
                 modifier = Modifier.fillMaxWidth()

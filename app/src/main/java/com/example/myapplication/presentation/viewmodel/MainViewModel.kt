@@ -14,7 +14,10 @@ import javax.inject.Inject
 
 sealed interface MainUiState {
     data object Loading : MainUiState
-    data class Ready(val isLoggedIn: Boolean, val settings: AppSettings) : MainUiState
+    data class Ready(val isLoggedIn: Boolean, val settings: AppSettings) : MainUiState {
+        /** Signed-in users and guests both start on Home; everyone else sees sign-in first. */
+        val canEnterApp: Boolean get() = isLoggedIn || settings.guestMode
+    }
 }
 
 /** Activity-level state: whether a session exists and the current theme settings. */

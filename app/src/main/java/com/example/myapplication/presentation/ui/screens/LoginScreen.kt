@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.screens
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ fun LoginScreen(
     onLoginClick: (email: String, password: String) -> Unit,
     onRegisterClick: () -> Unit,
     onForgotPasswordClick: () -> Unit,
+    onContinueAsGuest: () -> Unit = {},
     onInputChanged: () -> Unit = {}
 ) {
     var email by rememberSaveable { mutableStateOf("") }
@@ -65,10 +67,10 @@ fun LoginScreen(
             modifier = Modifier.size(96.dp)
         )
         Spacer(Modifier.height(24.dp))
-        Text("Welcome back", style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.login_title), style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Sign in to continue",
+            stringResource(R.string.login_subtitle),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -77,7 +79,7 @@ fun LoginScreen(
         AppTextField(
             value = email,
             onValueChange = { email = it; onInputChanged() },
-            label = "Email",
+            label = stringResource(R.string.field_email),
             leadingIcon = Icons.Default.Email,
             keyboardType = KeyboardType.Email,
             modifier = Modifier.testTag("email")
@@ -86,7 +88,7 @@ fun LoginScreen(
         PasswordTextField(
             value = password,
             onValueChange = { password = it; onInputChanged() },
-            label = "Password",
+            label = stringResource(R.string.field_password),
             leadingIcon = Icons.Default.Lock,
             imeAction = ImeAction.Done,
             onImeAction = submit,
@@ -94,13 +96,13 @@ fun LoginScreen(
         )
 
         TextButton(onClick = onForgotPasswordClick, modifier = Modifier.align(Alignment.End)) {
-            Text("Forgot password?")
+            Text(stringResource(R.string.login_forgot))
         }
 
         ErrorText(uiState.error, Modifier.padding(vertical = 8.dp))
 
         PrimaryButton(
-            text = "Sign in",
+            text = stringResource(R.string.login_sign_in),
             onClick = submit,
             loading = uiState.isLoading,
             modifier = Modifier.fillMaxWidth().testTag("login_button")
@@ -108,8 +110,11 @@ fun LoginScreen(
         Spacer(Modifier.height(16.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Don't have an account?", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = onRegisterClick) { Text("Sign up") }
+            Text(stringResource(R.string.login_no_account), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = onRegisterClick) { Text(stringResource(R.string.login_sign_up)) }
+        }
+        TextButton(onClick = onContinueAsGuest, modifier = Modifier.testTag("guest_button")) {
+            Text(stringResource(R.string.login_guest))
         }
     }
 }

@@ -31,3 +31,7 @@ keystore.properties
 *.log
 *.hprof
 captures/
+
+# Python
+__pycache__/
+*.pyc

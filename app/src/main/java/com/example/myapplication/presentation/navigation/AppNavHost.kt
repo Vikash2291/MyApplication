@@ -2,38 +2,59 @@ package com.example.myapplication.presentation.navigation
 
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
+import com.example.myapplication.R
+import com.example.myapplication.domain.quiz.QuizCategory
+import com.example.myapplication.domain.quiz.QuizMode
 import com.example.myapplication.presentation.ui.components.rememberActivity
 import com.example.myapplication.presentation.ui.screens.AboutScreen
+import com.example.myapplication.presentation.ui.screens.BookmarksScreen
 import com.example.myapplication.presentation.ui.screens.ForgotPasswordScreen
 import com.example.myapplication.presentation.ui.screens.HomeScreen
 import com.example.myapplication.presentation.ui.screens.LoginScreen
 import com.example.myapplication.presentation.ui.screens.ProfileScreen
+import com.example.myapplication.presentation.ui.screens.QuizScreen
 import com.example.myapplication.presentation.ui.screens.RegisterScreen
+import com.example.myapplication.presentation.ui.screens.ResultScreen
 import com.example.myapplication.presentation.ui.screens.SettingsScreen
+import com.example.myapplication.presentation.ui.screens.StatsScreen
 import com.example.myapplication.presentation.viewmodel.AuthEvent
 import com.example.myapplication.presentation.viewmodel.AuthViewModel
+import com.example.myapplication.presentation.viewmodel.BookmarksViewModel
 import com.example.myapplication.presentation.viewmodel.HomeEvent
 import com.example.myapplication.presentation.viewmodel.HomeViewModel
+import com.example.myapplication.presentation.viewmodel.QuizEvent
+import com.example.myapplication.presentation.viewmodel.QuizViewModel
+import com.example.myapplication.presentation.viewmodel.ResultViewModel
 import com.example.myapplication.presentation.viewmodel.SettingsEvent
 import com.example.myapplication.presentation.viewmodel.SettingsViewModel
+import com.example.myapplication.presentation.viewmodel.StatsViewModel
 
 @Composable
 fun AppNavHost(
     navController: NavHostController,
-    startDestination: String
+    startDestination: String,
+    onContinueAsGuest: () -> Unit
 ) {
     // Shared across auth/profile screens so state survives navigation between them.
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     fun goHome() = navController.navigate(Screen.Home.route) {
         popUpTo(0) { inclusive = true }
@@ -44,6 +65,9 @@ fun AppNavHost(
         popUpTo(0) { inclusive = true }
         launchSingleTop = true
     }
+
+    fun startQuiz(mode: QuizMode, category: QuizCategory? = null) =
+        navController.navigate(Screen.Quiz.create(mode, category)) { launchSingleTop = true }
 
     LaunchedEffect(authViewModel) {
         authViewModel.events.collect { event ->
@@ -67,6 +91,10 @@ fun AppNavHost(
                 onForgotPasswordClick = {
                     authViewModel.clearError()
                     navController.navigate(Screen.ForgotPassword.route)
+                },
+                onContinueAsGuest = {
+                    onContinueAsGuest()
+                    goHome()
                 },
                 onInputChanged = { if (authState.error != null) authViewModel.clearError() }
             )
@@ -106,31 +134,131 @@ fun AppNavHost(
                 homeViewModel.events.collect { event ->
                     when (event) {
                         is HomeEvent.RewardGranted ->
-                            snackbarHostState.showSnackbar("You earned ${event.amount} points!")
-                        is HomeEvent.ShowMessage -> snackbarHostState.showSnackbar(event.message)
+                            snackbarHostState.showSnackbar(context.getString(R.string.reward_granted, event.amount))
+                        is HomeEvent.Message -> snackbarHostState.showSnackbar(context.getString(event.res))
                     }
                 }
             }
 
-            // Interstitials only at a natural break after a user action (leaving Home for a
-            // secondary screen). AdsManager enforces: >= 2 user actions between interstitials,
-            // >= 2 minutes apart, never on launch/exit, never over another full-screen ad.
-            fun navigateWithBreak(route: String) {
-                if (activity != null) {
-                    homeViewModel.onNaturalBreak(activity) { navController.navigate(route) }
-                } else {
-                    navController.navigate(route)
-                }
-            }
-
+            // No interstitials here: Home -> secondary screens and Home -> Quiz never show one.
+            // The only interstitial break is Result -> Home (between quizzes), see below.
             HomeScreen(
                 uiState = homeState,
                 snackbarHostState = snackbarHostState,
+                onStartDaily = { startQuiz(QuizMode.DAILY) },
+                onStartCategory = { startQuiz(QuizMode.CATEGORY, it) },
                 onWatchRewardedAd = { activity?.let(homeViewModel::showRewardedAd) },
-                onProfileClick = { navigateWithBreak(Screen.Profile.route) },
-                onSettingsClick = { navigateWithBreak(Screen.Settings.route) },
-                onAboutClick = { navigateWithBreak(Screen.About.route) }
+                onBookmarksClick = { navController.navigate(Screen.Bookmarks.route) },
+                onStatsClick = { navController.navigate(Screen.Stats.route) },
+                onProfileClick = { navController.navigate(Screen.Profile.route) },
+                onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                onAboutClick = { navController.navigate(Screen.About.route) }
             )
+        }
+
+        composable(
+            route = Screen.Quiz.route,
+            arguments = listOf(
+                navArgument(QuizViewModel.ARG_MODE) { type = NavType.StringType },
+                navArgument(QuizViewModel.ARG_CATEGORY) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) {
+            val quizViewModel: QuizViewModel = hiltViewModel()
+            val quizState by quizViewModel.uiState.collectAsStateWithLifecycle()
+            val activity = rememberActivity()
+            val quizSnackbar = remember { SnackbarHostState() }
+
+            LaunchedEffect(quizViewModel) {
+                quizViewModel.events.collect { event ->
+                    when (event) {
+                        is QuizEvent.Finished -> navController.navigate(Screen.Result.create(event.attemptId)) {
+                            popUpTo(Screen.Home.route)
+                            launchSingleTop = true
+                        }
+                        is QuizEvent.Message -> quizSnackbar.showSnackbar(context.getString(event.res))
+                    }
+                }
+            }
+
+            // Pause the 20 s timer while the app is in the background.
+            val lifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(lifecycleOwner, quizViewModel) {
+                val observer = LifecycleEventObserver { _, e ->
+                    when (e) {
+                        Lifecycle.Event.ON_PAUSE -> quizViewModel.setPaused(true)
+                        Lifecycle.Event.ON_RESUME -> quizViewModel.setPaused(false)
+                        else -> Unit
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+
+            QuizScreen(
+                uiState = quizState,
+                snackbarHostState = quizSnackbar,
+                onSelect = quizViewModel::selectOption,
+                onNext = quizViewModel::next,
+                onHint = { activity?.let(quizViewModel::useHint) },
+                onExtraTime = { activity?.let(quizViewModel::useExtraTime) },
+                onToggleBookmark = quizViewModel::toggleBookmark,
+                onExit = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.Result.route,
+            arguments = listOf(navArgument(ResultViewModel.ARG_ATTEMPT_ID) { type = NavType.LongType })
+        ) {
+            val resultViewModel: ResultViewModel = hiltViewModel()
+            val resultState by resultViewModel.uiState.collectAsStateWithLifecycle()
+            val activity = rememberActivity()
+
+            fun backToHome() {
+                val go = { navController.popBackStack(Screen.Home.route, inclusive = false); Unit }
+                // Natural break between quizzes: AdsManager counts the action and shows an
+                // interstitial only if pacing allows (>= 2 actions, >= 2 min apart, consent given).
+                if (activity != null) resultViewModel.onNaturalBreak(activity, go) else go()
+            }
+
+            ResultScreen(
+                uiState = resultState,
+                onHome = ::backToHome,
+                onPlayAgain = {
+                    val review = resultState.review
+                    val mode = review?.mode ?: QuizMode.CATEGORY
+                    if (mode == QuizMode.CATEGORY && review?.category == null) {
+                        backToHome()
+                    } else {
+                        navController.navigate(Screen.Quiz.create(mode, review?.category)) {
+                            popUpTo(Screen.Home.route)
+                            launchSingleTop = true
+                        }
+                    }
+                },
+                onToggleBookmark = resultViewModel::toggleBookmark
+            )
+        }
+
+        composable(Screen.Bookmarks.route) {
+            val vm: BookmarksViewModel = hiltViewModel()
+            val state by vm.uiState.collectAsStateWithLifecycle()
+            BookmarksScreen(
+                uiState = state,
+                onPractice = { startQuiz(QuizMode.BOOKMARKS) },
+                onRemove = vm::removeBookmark,
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Stats.route) {
+            val vm: StatsViewModel = hiltViewModel()
+            val state by vm.uiState.collectAsStateWithLifecycle()
+            StatsScreen(uiState = state, onBackClick = { navController.popBackStack() })
         }
 
         composable(Screen.Profile.route) {
@@ -142,6 +270,7 @@ fun AppNavHost(
                 onLogout = authViewModel::logout,
                 onDeleteAccount = { password -> authViewModel.deleteAccount(password) },
                 onCancelReauth = authViewModel::cancelReauth,
+                onSignInClick = { navController.navigate(Screen.Login.route) },
                 onBackClick = { navController.popBackStack() }
             )
         }
@@ -154,8 +283,8 @@ fun AppNavHost(
             LaunchedEffect(settingsViewModel) {
                 settingsViewModel.events.collect { event ->
                     when (event) {
-                        SettingsEvent.DataCleared -> snackbarHostState.showSnackbar("Settings reset")
-                        is SettingsEvent.Message -> snackbarHostState.showSnackbar(event.text)
+                        SettingsEvent.DataCleared -> snackbarHostState.showSnackbar(context.getString(R.string.settings_reset_done))
+                        is SettingsEvent.Message -> snackbarHostState.showSnackbar(context.getString(event.res))
                     }
                 }
             }
@@ -167,6 +296,7 @@ fun AppNavHost(
                 onDynamicColorChange = settingsViewModel::setDynamicColor,
                 onNotificationsChange = settingsViewModel::setNotificationsEnabled,
                 onAdMobChange = settingsViewModel::setAdMobEnabled,
+                onLanguageChange = settingsViewModel::setLanguage,
                 onPrivacyOptionsClick = { activity?.let(settingsViewModel::openPrivacyOptions) },
                 onClearData = settingsViewModel::clearData,
                 onDeleteAccountClick = { navController.navigate(Screen.Profile.route) },

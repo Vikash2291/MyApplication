@@ -1,5 +1,8 @@
 package com.example.myapplication.presentation.ui.screens
 
+import androidx.compose.ui.text.style.TextAlign
+import com.example.myapplication.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,6 +63,7 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     onDeleteAccount: (password: String?) -> Unit,
     onCancelReauth: () -> Unit,
+    onSignInClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
     val user = uiState.user
@@ -73,7 +77,7 @@ fun ProfileScreen(
     }
 
     Scaffold(
-        topBar = { AppTopBar("Profile", onNavigateUp = onBackClick) },
+        topBar = { AppTopBar(stringResource(R.string.profile_title), onNavigateUp = onBackClick) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
@@ -86,10 +90,24 @@ fun ProfileScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Avatar(user?.photoUrl, user?.displayName ?: user?.email)
-            Text(user?.displayName ?: "No name set", style = MaterialTheme.typography.titleLarge)
-            Text(user?.email.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (user == null) {
+                // Guest: progress lives on this device only; offer sign-in instead of account actions.
+                Text(stringResource(R.string.profile_guest_title), style = MaterialTheme.typography.titleLarge)
+                Text(
+                    stringResource(R.string.profile_guest_body),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                PrimaryButton(
+                    text = stringResource(R.string.login_sign_in),
+                    onClick = onSignInClick,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+            Text(user.displayName ?: stringResource(R.string.profile_no_name), style = MaterialTheme.typography.titleLarge)
+            Text(user.email, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            if (user != null) {
+            run {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         if (user.isEmailVerified) Icons.Default.CheckCircle else Icons.Default.Warning,
@@ -98,21 +116,21 @@ fun ProfileScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(Modifier.size(6.dp))
-                    Text(if (user.isEmailVerified) "Email verified" else "Email not verified")
+                    Text(stringResource(if (user.isEmailVerified) R.string.profile_email_verified else R.string.profile_email_not_verified))
                     if (!user.isEmailVerified) {
-                        TextButton(onClick = onVerifyEmail) { Text("Send link") }
+                        TextButton(onClick = onVerifyEmail) { Text(stringResource(R.string.profile_send_link)) }
                     }
                 }
             }
 
-            SectionHeader("Edit profile", Modifier.fillMaxWidth())
+            SectionHeader(stringResource(R.string.profile_edit), Modifier.fillMaxWidth())
             AppCard {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AppTextField(name, { name = it }, "Display name")
-                    AppTextField(photoUrl, { photoUrl = it }, "Photo URL (optional)")
+                    AppTextField(name, { name = it }, stringResource(R.string.profile_display_name))
+                    AppTextField(photoUrl, { photoUrl = it }, stringResource(R.string.profile_photo_url))
                     ErrorText(uiState.error)
                     PrimaryButton(
-                        text = "Save changes",
+                        text = stringResource(R.string.profile_save),
                         onClick = { onSaveProfile(name, photoUrl) },
                         loading = uiState.isLoading,
                         modifier = Modifier.fillMaxWidth()
@@ -120,19 +138,19 @@ fun ProfileScreen(
                 }
             }
 
-            if (user != null) {
-                SectionHeader("Account", Modifier.fillMaxWidth())
+            run {
+                SectionHeader(stringResource(R.string.profile_account), Modifier.fillMaxWidth())
                 AppCard {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        InfoRow("Member since", formatTimestamp(user.createdAt))
-                        InfoRow("Last sign-in", formatTimestamp(user.lastLoginAt))
+                        InfoRow(stringResource(R.string.profile_member_since), formatTimestamp(user.createdAt))
+                        InfoRow(stringResource(R.string.profile_last_sign_in), formatTimestamp(user.lastLoginAt))
                     }
                 }
             }
 
             Spacer(Modifier.height(8.dp))
             SecondaryButton(
-                text = "Sign out",
+                text = stringResource(R.string.profile_sign_out),
                 onClick = onLogout,
                 icon = Icons.AutoMirrored.Filled.Logout,
                 modifier = Modifier.fillMaxWidth()
@@ -140,7 +158,8 @@ fun ProfileScreen(
             TextButton(onClick = { confirmDelete = true }) {
                 Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.size(6.dp))
-                Text("Delete account", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.profile_delete_account), color = MaterialTheme.colorScheme.error)
+            }
             }
         }
     }
@@ -148,19 +167,16 @@ fun ProfileScreen(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Delete account?") },
+            title = { Text(stringResource(R.string.profile_delete_title)) },
             text = {
-                Text(
-                    "This permanently deletes your account, reward points and all data stored " +
-                        "on this device. This cannot be undone."
-                )
+                Text(stringResource(R.string.profile_delete_body))
             },
             confirmButton = {
                 TextButton(onClick = { confirmDelete = false; onDeleteAccount(null) }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
     if (uiState.isReauthRequired) {
@@ -183,20 +199,20 @@ private fun ReauthDialog(
     var password by rememberSaveable { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Confirm your password") },
+        title = { Text(stringResource(R.string.reauth_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("For your security, enter your password to permanently delete your account.")
-                PasswordTextField(password, { password = it }, "Password", onImeAction = { onConfirm(password) })
+                Text(stringResource(R.string.reauth_body))
+                PasswordTextField(password, { password = it }, stringResource(R.string.field_password), onImeAction = { onConfirm(password) })
                 ErrorText(error)
             }
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(password) }, enabled = password.isNotBlank() && !isLoading) {
-                Text("Delete account", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.profile_delete_account), color = MaterialTheme.colorScheme.error)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } }
     )
 }
 
@@ -207,7 +223,7 @@ private fun Avatar(photoUrl: String?, fallbackName: String?) {
         .clip(CircleShape)
         .background(MaterialTheme.colorScheme.primaryContainer)
     if (!photoUrl.isNullOrBlank()) {
-        AsyncImage(model = photoUrl, contentDescription = "Profile photo", contentScale = ContentScale.Crop, modifier = modifier)
+        AsyncImage(model = photoUrl, contentDescription = stringResource(R.string.cd_profile_photo), contentScale = ContentScale.Crop, modifier = modifier)
     } else {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(

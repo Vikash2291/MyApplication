@@ -3,10 +3,13 @@ package com.example.myapplication.presentation.viewmodel
 import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.annotation.StringRes
+import com.example.myapplication.R
 import com.example.myapplication.data.ads.AdsManager
 import com.example.myapplication.data.local.preferences.AppSettings
 import com.example.myapplication.data.local.preferences.PreferencesRepository
 import com.example.myapplication.domain.model.ThemeMode
+import com.example.myapplication.domain.quiz.AppLanguage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -25,7 +28,7 @@ data class SettingsUiState(
 
 sealed interface SettingsEvent {
     data object DataCleared : SettingsEvent
-    data class Message(val text: String) : SettingsEvent
+    data class Message(@StringRes val res: Int) : SettingsEvent
 }
 
 @HiltViewModel
@@ -48,9 +51,10 @@ class SettingsViewModel @Inject constructor(
     fun setDynamicColor(enabled: Boolean) = save { setDynamicColor(enabled) }
     fun setNotificationsEnabled(enabled: Boolean) = save { setNotificationsEnabled(enabled) }
     fun setAdMobEnabled(enabled: Boolean) = save { setAdMobEnabled(enabled) }
+    fun setLanguage(language: AppLanguage) = save { setLanguage(language) }
 
     fun openPrivacyOptions(activity: Activity) = adsManager.showPrivacyOptionsForm(activity) { error ->
-        if (error != null) viewModelScope.launch { _events.send(SettingsEvent.Message("Couldn't open privacy options: $error")) }
+        if (error != null) viewModelScope.launch { _events.send(SettingsEvent.Message(R.string.privacy_options_error)) }
     }
 
     fun clearData() {

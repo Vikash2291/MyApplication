@@ -9,6 +9,7 @@ import com.example.myapplication.data.local.preferences.PreferencesRepository
 import com.example.myapplication.data.remote.ApiService
 import com.example.myapplication.domain.model.Result
 import com.example.myapplication.domain.model.User
+import com.example.myapplication.domain.quiz.QuizRepository
 import com.example.myapplication.domain.repository.UserRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,7 +20,8 @@ class UserRepositoryImpl @Inject constructor(
     private val apiService: ApiService,
     private val userDao: UserDao,
     private val settingsDao: SettingsDao,
-    private val preferencesRepository: PreferencesRepository
+    private val preferencesRepository: PreferencesRepository,
+    private val quizRepository: QuizRepository
 ) : UserRepository {
 
     override suspend fun getUserProfile(userId: String): Result<User> = safeCall("Failed to load profile") {
@@ -57,6 +59,7 @@ class UserRepositoryImpl @Inject constructor(
         // Only wipe local data once the identity provider confirmed the deletion.
         userDao.clearAllUsers()
         settingsDao.clearAllSettings()
+        quizRepository.clearUserData()
         preferencesRepository.clearAll()
         authDataSource.signOut()
         Result.Success(Unit)

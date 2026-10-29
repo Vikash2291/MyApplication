@@ -1,5 +1,8 @@
 package com.example.myapplication.presentation.ui.screens
 
+import com.example.myapplication.domain.quiz.AppLanguage
+import com.example.myapplication.R
+import androidx.compose.ui.res.stringResource
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,6 +21,7 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -52,6 +56,7 @@ fun SettingsScreen(
     onDynamicColorChange: (Boolean) -> Unit,
     onNotificationsChange: (Boolean) -> Unit,
     onAdMobChange: (Boolean) -> Unit,
+    onLanguageChange: (AppLanguage) -> Unit,
     onPrivacyOptionsClick: () -> Unit,
     onClearData: () -> Unit,
     onDeleteAccountClick: () -> Unit,
@@ -61,7 +66,7 @@ fun SettingsScreen(
     var confirmClear by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { AppTopBar("Settings", onNavigateUp = onBackClick) },
+        topBar = { AppTopBar(stringResource(R.string.settings_title), onNavigateUp = onBackClick) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
@@ -72,13 +77,46 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SectionHeader("Appearance")
+            SectionHeader(stringResource(R.string.settings_language))
+            AppCard {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Translate, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(16.dp))
+                        Column {
+                            Text(stringResource(R.string.settings_language_title), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                stringResource(R.string.settings_language_subtitle),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AppLanguage.entries.forEach { language ->
+                            FilterChip(
+                                selected = s.language == language,
+                                onClick = { onLanguageChange(language) },
+                                label = {
+                                    // Each language is shown in its own script so it is always recognisable.
+                                    Text(if (language == AppLanguage.HINDI) "हिन्दी" else "English")
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            SectionHeader(stringResource(R.string.settings_appearance))
             AppCard {
                 Column(Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(16.dp))
-                        Text("Theme", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.settings_theme), style = MaterialTheme.typography.titleMedium)
                     }
                     Row(
                         Modifier.fillMaxWidth().padding(top = 8.dp),
@@ -88,52 +126,62 @@ fun SettingsScreen(
                             FilterChip(
                                 selected = s.themeMode == mode,
                                 onClick = { onThemeChange(mode) },
-                                label = { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                                label = {
+                                    Text(
+                                        stringResource(
+                                            when (mode) {
+                                                ThemeMode.SYSTEM -> R.string.theme_system
+                                                ThemeMode.LIGHT -> R.string.theme_light
+                                                ThemeMode.DARK -> R.string.theme_dark
+                                            }
+                                        )
+                                    )
+                                }
                             )
                         }
                     }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                        SwitchRow(Icons.Default.ColorLens, "Dynamic colors", "Match your wallpaper", s.dynamicColor, onDynamicColorChange)
+                        SwitchRow(Icons.Default.ColorLens, stringResource(R.string.settings_dynamic_color), stringResource(R.string.settings_dynamic_color_subtitle), s.dynamicColor, onDynamicColorChange)
                     }
                 }
             }
 
-            SectionHeader("Notifications")
+            SectionHeader(stringResource(R.string.settings_notifications))
             AppCard {
                 Column(Modifier.padding(16.dp)) {
-                    SwitchRow(Icons.Default.Notifications, "Push notifications", "News and updates", s.notificationsEnabled, onNotificationsChange)
+                    SwitchRow(Icons.Default.Notifications, stringResource(R.string.settings_push), stringResource(R.string.settings_push_subtitle), s.notificationsEnabled, onNotificationsChange)
                 }
             }
 
-            SectionHeader("Ads & privacy")
+            SectionHeader(stringResource(R.string.settings_ads_privacy))
             AppCard {
                 Column(Modifier.padding(16.dp)) {
-                    SwitchRow(Icons.Default.AdUnits, "Ads", "Banner, interstitial and app open ads (via AdMob)", s.adMobEnabled, onAdMobChange)
+                    SwitchRow(Icons.Default.AdUnits, stringResource(R.string.settings_ads), stringResource(R.string.settings_ads_subtitle), s.adMobEnabled, onAdMobChange)
                     // Required by UMP when the user is in a regulated region (e.g. EEA/UK, US states).
                     if (uiState.isPrivacyOptionsRequired) {
                         HorizontalDivider(Modifier.padding(vertical = 8.dp))
                         TextButton(onClick = onPrivacyOptionsClick) {
                             Icon(Icons.Default.PrivacyTip, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Privacy options")
+                            Text(stringResource(R.string.settings_privacy_options))
                         }
                     }
                 }
             }
 
-            SectionHeader("Data")
+            SectionHeader(stringResource(R.string.settings_data))
             AppCard {
                 Column(Modifier.padding(8.dp)) {
                     TextButton(onClick = { confirmClear = true }) {
                         Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                         Spacer(Modifier.width(8.dp))
-                        Text("Reset all settings", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.settings_reset), color = MaterialTheme.colorScheme.error)
                     }
                     TextButton(onClick = onDeleteAccountClick) {
                         Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                         Spacer(Modifier.width(8.dp))
-                        Text("Delete account…", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.settings_delete_account), color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -143,10 +191,10 @@ fun SettingsScreen(
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("Reset settings?") },
-            text = { Text("All preferences and reward points on this device will be reset.") },
-            confirmButton = { TextButton(onClick = { confirmClear = false; onClearData() }) { Text("Reset") } },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } }
+            title = { Text(stringResource(R.string.settings_reset_title)) },
+            text = { Text(stringResource(R.string.settings_reset_body)) },
+            confirmButton = { TextButton(onClick = { confirmClear = false; onClearData() }) { Text(stringResource(R.string.action_reset)) } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.action_cancel)) } }
         )
     }
 }

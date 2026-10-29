@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.screens
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,7 +22,7 @@ import com.example.myapplication.presentation.ui.components.AppTopBar
 
 @Composable
 fun AboutScreen(onBackClick: () -> Unit) {
-    Scaffold(topBar = { AppTopBar("About", onNavigateUp = onBackClick) }) { padding ->
+    Scaffold(topBar = { AppTopBar(stringResource(R.string.about_title), onNavigateUp = onBackClick) }) { padding ->
         Column(
             Modifier
                 .fillMaxSize()
@@ -31,14 +32,14 @@ fun AboutScreen(onBackClick: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(96.dp))
-            Text(androidx.compose.ui.res.stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
-            Text("Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.about_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
-                "Built with Kotlin, Jetpack Compose, Hilt, Room, Firebase and Google AdMob.",
+                stringResource(R.string.about_body),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium
             )
-            Text("© 2026 MyApplication. MIT License.", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.about_copyright), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

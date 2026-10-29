@@ -7,6 +7,7 @@ import com.example.myapplication.data.local.preferences.PreferencesRepository
 import com.example.myapplication.data.remote.ApiService
 import com.example.myapplication.domain.model.ReauthenticationRequiredException
 import com.example.myapplication.domain.model.Result
+import com.example.myapplication.domain.quiz.QuizRepository
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -24,8 +25,9 @@ class UserRepositoryImplTest {
     private val userDao: UserDao = mockk(relaxed = true)
     private val settingsDao: SettingsDao = mockk(relaxed = true)
     private val preferences: PreferencesRepository = mockk(relaxed = true)
+    private val quizRepository: QuizRepository = mockk(relaxed = true)
 
-    private val repository = UserRepositoryImpl(authDataSource, apiService, userDao, settingsDao, preferences)
+    private val repository = UserRepositoryImpl(authDataSource, apiService, userDao, settingsDao, preferences, quizRepository)
 
     @Test
     fun `deleteAccount deletes user then wipes Room and DataStore and signs out`() = runTest {
@@ -38,6 +40,7 @@ class UserRepositoryImplTest {
             authDataSource.deleteUser()
             userDao.clearAllUsers()
             settingsDao.clearAllSettings()
+            quizRepository.clearUserData()
             preferences.clearAll()
         }
         verify { authDataSource.signOut() }
@@ -53,6 +56,7 @@ class UserRepositoryImplTest {
         assertThat((result as Result.Error).exception).isInstanceOf(ReauthenticationRequiredException::class.java)
         coVerify(exactly = 0) { userDao.clearAllUsers() }
         coVerify(exactly = 0) { preferences.clearAll() }
+        coVerify(exactly = 0) { quizRepository.clearUserData() }
         verify(exactly = 0) { authDataSource.signOut() }
     }
 

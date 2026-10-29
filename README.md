@@ -1,6 +1,44 @@
-# MyApplication
+# GK Quiz – Hindi & English
 
-Production-ready Android application built with modern architecture and best practices.
+A bilingual (English / हिन्दी) general-knowledge quiz app built on a production-ready Android
+architecture (Kotlin, Compose, Hilt, Room, DataStore, Firebase Auth, AdMob + UMP).
+Application id: `com.alfred.myapplication`.
+
+## 🧠 Quiz features
+
+- **Offline question bank**: 300+ fact-checked multiple-choice questions (4 options, one correct
+  answer, short explanation) in English and Hindi, bundled in `app/src/main/assets/questions.json`
+  and imported into Room on first launch. Categories: India GK, World GK, Science, History,
+  Geography, Sports, Current Affairs (settled, dated facts only) and Computers.
+- **Quiz**: 10 questions, 20 seconds each, instant right/wrong feedback with explanation,
+  bookmark any question. Least-seen questions are served first.
+- **Daily Quiz**: the same 10 questions for everyone on a given date
+  (`DailyQuizSelector`, deterministic), with a daily streak stored in DataStore.
+- **Result**: score, points earned, full answer review with explanations.
+- **Bookmarks**, **Progress/Stats** (accuracy, coverage and best score per category, streaks).
+- **Language toggle** in Settings (DataStore): UI strings come from `values/` and `values-hi/`,
+  question text from the per-question translations.
+- **Points**: 10 per correct answer, +20 for a perfect quiz, +10 for completing the daily quiz.
+- Sign in with email (Firebase) or continue as a guest; in-app account deletion wipes quiz data too.
+
+### Ads policy in the quiz
+
+- Rewarded (opt-in only): "50:50 hint" or "+10 s time" during a question; the timer pauses while
+  the video plays.
+- Interstitial: only at the break between quizzes (Result → Home), using the existing pacing
+  (≥ 2 user actions and ≥ 2 minutes between interstitials).
+- Banner: Home and Result only, in a fixed bottom slot. Never on the Quiz screen near answers.
+
+### Editing the question bank
+
+Questions live in `tools/questions/bank_*.py` (correct option first). Regenerate the asset with:
+
+```bash
+python3 tools/questions/build_bank.py   # validates, shuffles options deterministically, writes JSON
+```
+
+Append new questions at the end of a list (ids stay stable) and bump `BANK_VERSION` so
+installed apps re-import the bank. `QuestionBankTest` guards the asset in CI.
 
 ## 🏗 Architecture
 
