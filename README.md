@@ -28,7 +28,7 @@ Data Layer
 ├── local/           # Room database, DataStore preferences
 ├── remote/          # Retrofit API service, DTOs
 ├── repository/      # Repository implementations
-└── ads/             # AdMob + Unity LevelPlay mediation
+└── ads/             # AdMob Mediation (Unity bidding), UMP, app open
 
 Presentation Layer
 ├── navigation/      # Navigation graph & navigator
@@ -43,8 +43,8 @@ Presentation Layer
 
 | Category | Technology |
 |----------|------------|
-| **Language** | Kotlin 1.9.23 |
-| **Build** | Gradle 8.7 (KTS) + Version Catalogs |
+| **Language** | Kotlin 2.2 |
+| **Build** | Gradle 8.14 + AGP 8.13 (KTS) + Version Catalogs |
 | **Architecture** | Clean Architecture + MVVM |
 | **DI** | Hilt 2.48 |
 | **Async** | Coroutines + Flow |
@@ -54,7 +54,7 @@ Presentation Layer
 | **UI** | Jetpack Compose + Material3 + Navigation Compose |
 | **Auth** | Firebase Auth |
 | **Analytics/Crashlytics** | Firebase Analytics + Crashlytics |
-| **Ads** | AdMob + Unity LevelPlay (Bidding Mediation) |
+| **Ads** | AdMob Mediation (Unity Ads as bidding source) + UMP |
 | **Testing** | JUnit 4, MockK, Truth, Coroutines Test, Compose UI Test |
 | **Static Analysis** | Detekt |
 | **CI/CD** | GitHub Actions |
@@ -63,9 +63,10 @@ Presentation Layer
 
 - ✅ **Authentication** - Email/password with Firebase Auth + backend sync
 - ✅ **User Profile** - Display name, photo, email verification
+- ✅ **Account deletion** - In-app (Profile, or Settings → Data), with password re-auth when Firebase requires a recent login; wipes Room + DataStore
 - ✅ **Offline-first** - Room database with reactive Flow streams
 - ✅ **Preferences** - DataStore (type-safe, async)
-- ✅ **Ads Monetization** - AdMob + Unity LevelPlay bidding (rewarded, interstitial, banner)
+- ✅ **Ads Monetization** - AdMob Mediation with Unity bidding (rewarded, interstitial, app open, banner)
 - ✅ **Consent Management** - UMP (User Messaging Platform) for GDPR/CCPA
 - ✅ **Analytics** - Firebase Analytics + Crashlytics
 - ✅ **Push Notifications** - FCM ready
@@ -79,7 +80,7 @@ Presentation Layer
 
 - Android Studio Koala (2024.1.1)+
 - JDK 17
-- Android SDK 34
+- Android SDK 36 (compileSdk/targetSdk 36, minSdk 24)
 
 ### Setup
 
@@ -101,17 +102,20 @@ The app builds and runs **without** any keys:
 |------|-------|
 | Firebase (Auth, Analytics, Crashlytics, FCM) | Create a Firebase project, enable Email/Password auth, put `google-services.json` in `app/` |
 | AdMob App ID | `./gradlew assembleRelease -PADMOB_APP_ID=ca-app-pub-xxx~yyy` (or edit `manifestPlaceholders` in `app/build.gradle.kts`) |
-| AdMob ad unit IDs | `app/src/main/res/values/strings.xml` |
-| Unity Ads (fallback) | `unity_game_id` in `strings.xml` (empty = disabled) |
+| AdMob ad unit IDs | Debug: Google test IDs in `app/src/main/res/values/strings.xml`. Release: `app/src/release/res/values/ads.xml` (app open unit is still a TODO test ID) |
+| Unity Ads | No app config: add Unity as a **bidding** source in an AdMob mediation group (adapter `com.google.ads.mediation:unity`) |
 | Backend (optional) | `API_BASE_URL` in `app/build.gradle.kts`; all backend calls are best-effort |
 | Release signing | `release.keystore` in project root + `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` env vars or `keystore.properties` |
 
 ### Ads strategy built in
-- **Rewarded video** on Home grants reward points (user-initiated, policy-safe).
-- **Interstitial** only at a natural break (leaving Home for Settings/About), capped to one per 2 minutes.
-- **Adaptive anchored banner** at the bottom of Home.
-- **UMP consent** form before any ad request; privacy options in Settings when required (GDPR).
-- AdMob primary, Unity Ads fallback; both can be toggled in Settings.
+- **AdMob Mediation** is the only ad layer. Unity Ads joins as a **bidding** source via the AdMob adapter (Unity's waterfall placements were retired in Jan 2026); no Unity code or placement IDs live in the app.
+- **UMP consent** is requested on every launch; Mobile Ads is initialised and ads are loaded only when `canRequestAds()` is true. Settings shows **Privacy options** when UMP says they are required.
+- **Rewarded video** (main format) on Home: opt-in, grants reward points.
+- **Interstitial** only at natural breaks after a user action (leaving Home), max one per 2 user actions **and** at least 2 minutes apart; never on launch or exit.
+- **App open** ad when returning to the app from the background: max once per 4 hours, never on the first cold start, never before consent, never over another full-screen ad.
+- **Adaptive banner** in a fixed-height reserved slot at the bottom of Home, separated from buttons.
+- Rewarded and interstitial ads are preloaded and reloaded right after dismissal.
+- Debug builds always use Google test ad units; never click live ads.
 
 ## 🧪 Testing
 
@@ -180,7 +184,7 @@ com.example.myapplication
 │   ├── local/                    # Database, DataStore, DAOs
 │   ├── remote/                   # API service, DTOs, NetworkModule
 │   ├── repository/               # Repository implementations
-│   └── ads/                      # AdsManager (AdMob + Unity)
+│   └── ads/                      # AdsManager + AppOpenAdManager (AdMob Mediation)
 ├── domain/
 │   ├── model/                    # Domain entities
 │   ├── repository/               # Repository interfaces
@@ -208,23 +212,13 @@ Switch themes in Settings → Appearance → Theme (System/Light/Dark).
 
 ## 📊 Ads Integration
 
-### AdMob + Unity LevelPlay Bidding
+### AdMob Mediation + Unity Ads bidding
 
-The `AdsManager` implements **bidding mediation** (not waterfall):
-1. AdMob bidding (primary)
-2. Unity Ads bidding (fallback)
-3. Automatic preloading & refresh
-4. Rewarded, Interstitial, Banner support
-5. UMP consent for GDPR/CCPA
-
-### To Maximize eCPM:
-
-1. Enable **Bidding** in Unity Dashboard (not Waterfall)
-2. Add mediation networks: AppLovin, AdMob, ironSource, Vungle
-3. Set "Child-directed" = OFF in Unity Dashboard
-4. Implement GDPR consent (`setConsent(true)`)
-5. Use **Rewarded Video** at high-intent moments (revive, bonus, daily reward)
-6. Test on **real device** with `testMode = false`
+See "Ads strategy built in" above. Dashboard steps:
+1. AdMob: create GDPR and US-states messages (Privacy & messaging), and an App open ad unit (put its ID in `app/src/release/res/values/ads.xml`).
+2. Unity: create a project in "I will use Mediation → AdMob" mode and set the COPPA designation.
+3. AdMob: Mediation → mediation group per format → add **Unity Ads (bidding)**.
+4. Publish `app-ads.txt` (AdMob + Unity lines) on the developer website listed on Google Play.
 
 ## 🔒 Security
 

@@ -43,6 +43,7 @@ import com.example.myapplication.presentation.ui.components.AppCard
 import com.example.myapplication.presentation.ui.components.AppTextField
 import com.example.myapplication.presentation.ui.components.AppTopBar
 import com.example.myapplication.presentation.ui.components.ErrorText
+import com.example.myapplication.presentation.ui.components.PasswordTextField
 import com.example.myapplication.presentation.ui.components.PrimaryButton
 import com.example.myapplication.presentation.ui.components.SecondaryButton
 import com.example.myapplication.presentation.ui.components.SectionHeader
@@ -57,7 +58,8 @@ fun ProfileScreen(
     onSaveProfile: (displayName: String, photoUrl: String) -> Unit,
     onVerifyEmail: () -> Unit,
     onLogout: () -> Unit,
-    onDeleteAccount: () -> Unit,
+    onDeleteAccount: (password: String?) -> Unit,
+    onCancelReauth: () -> Unit,
     onBackClick: () -> Unit
 ) {
     val user = uiState.user
@@ -147,15 +149,55 @@ fun ProfileScreen(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete account?") },
-            text = { Text("This permanently deletes your account and data. You may need to sign in again first.") },
+            text = {
+                Text(
+                    "This permanently deletes your account, reward points and all data stored " +
+                        "on this device. This cannot be undone."
+                )
+            },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; onDeleteAccount() }) {
+                TextButton(onClick = { confirmDelete = false; onDeleteAccount(null) }) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
         )
     }
+    if (uiState.isReauthRequired) {
+        ReauthDialog(
+            isLoading = uiState.isLoading,
+            error = uiState.error,
+            onConfirm = { onDeleteAccount(it) },
+            onDismiss = onCancelReauth
+        )
+    }
+}
+
+@Composable
+private fun ReauthDialog(
+    isLoading: Boolean,
+    error: String?,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var password by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Confirm your password") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("For your security, enter your password to permanently delete your account.")
+                PasswordTextField(password, { password = it }, "Password", onImeAction = { onConfirm(password) })
+                ErrorText(error)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(password) }, enabled = password.isNotBlank() && !isLoading) {
+                Text("Delete account", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable

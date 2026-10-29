@@ -21,5 +21,9 @@ interface AuthRepository {
 interface UserRepository {
     suspend fun getUserProfile(userId: String): Result<User>
     suspend fun refreshUserProfile(): Result<User?>
-    suspend fun deleteAccount(): Result<Unit>
+    /**
+     * Permanently deletes the account and all local data, then signs out. Pass [password] to
+     * re-authenticate first (after a [com.example.myapplication.domain.model.ReauthenticationRequiredException]).
+     */
+    suspend fun deleteAccount(password: String? = null): Result<Unit>
 }

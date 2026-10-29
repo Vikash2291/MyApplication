@@ -80,5 +80,8 @@ class SendEmailVerificationUseCase @Inject constructor(
 class DeleteAccountUseCase @Inject constructor(
     private val userRepository: UserRepository
 ) {
-    suspend operator fun invoke(): Result<Unit> = userRepository.deleteAccount()
+    suspend operator fun invoke(password: String? = null): Result<Unit> {
+        if (password != null && password.isBlank()) return Result.Error("Enter your password")
+        return userRepository.deleteAccount(password)
+    }
 }

@@ -4,8 +4,10 @@ import android.app.Activity
 import kotlinx.coroutines.flow.StateFlow
 
 data class AdsState(
-    val isInitialized: Boolean = false,
+    /** UMP finished its first update of this launch (successfully or not). */
+    val isConsentResolved: Boolean = false,
     val canRequestAds: Boolean = false,
+    val isInitialized: Boolean = false,
     val isRewardedReady: Boolean = false,
     val isInterstitialReady: Boolean = false,
     val isPrivacyOptionsRequired: Boolean = false
@@ -19,22 +21,33 @@ sealed interface RewardOutcome {
 }
 
 /**
- * AdMob is the primary network; Unity Ads is used as a fallback whenever an AdMob
- * full-screen ad is not ready. Consent is gathered with Google UMP before any request.
+ * Single entry point for ads. All demand goes through AdMob Mediation; Unity Ads takes part as
+ * a bidding source configured in the AdMob dashboard (no Unity code in the app). Consent is
+ * gathered with Google UMP on every launch, and nothing is requested before canRequestAds().
  */
 interface AdsManager {
     val state: StateFlow<AdsState>
 
-    /** Gathers UMP consent (showing the form if required) and initialises SDKs. */
+    /** Requests a UMP consent update (every launch), shows the form if required, then initialises. */
     fun gatherConsentAndInitialize(activity: Activity)
-    fun showPrivacyOptionsForm(activity: Activity)
+
+    /** Opens the UMP privacy options form (only offered when it is required). */
+    fun showPrivacyOptionsForm(activity: Activity, onDismissed: (error: String?) -> Unit = {})
 
     fun preloadAds()
+
+    /** User-initiated, opt-in rewarded ad. */
     fun showRewardedAd(activity: Activity, onResult: (RewardOutcome) -> Unit)
 
-    /** Shows an interstitial if one is ready and the frequency cap allows it. */
-    fun showInterstitialAd(activity: Activity, force: Boolean = false, onDismissed: () -> Unit = {})
+    /**
+     * Call at a natural break that follows a user action (e.g. navigating to another screen).
+     * Records the action, then shows an interstitial only if the pacing rules allow it.
+     * [onContinue] always runs exactly once: immediately, or after the ad is dismissed.
+     */
+    fun onNaturalBreak(activity: Activity, onContinue: () -> Unit)
+
+    /** True while an interstitial, rewarded or app open ad is on screen. */
+    val isFullScreenAdShowing: Boolean
 
     val bannerAdUnitId: String
-    val bannersEnabled: Boolean
 }

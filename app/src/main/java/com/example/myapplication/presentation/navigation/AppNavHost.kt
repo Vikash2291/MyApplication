@@ -112,11 +112,12 @@ fun AppNavHost(
                 }
             }
 
-            // Interstitials only at a natural break (leaving Home for a secondary screen),
-            // capped inside AdsManager to one every two minutes.
+            // Interstitials only at a natural break after a user action (leaving Home for a
+            // secondary screen). AdsManager enforces: >= 2 user actions between interstitials,
+            // >= 2 minutes apart, never on launch/exit, never over another full-screen ad.
             fun navigateWithBreak(route: String) {
                 if (activity != null) {
-                    homeViewModel.maybeShowInterstitial(activity) { navController.navigate(route) }
+                    homeViewModel.onNaturalBreak(activity) { navController.navigate(route) }
                 } else {
                     navController.navigate(route)
                 }
@@ -126,7 +127,7 @@ fun AppNavHost(
                 uiState = homeState,
                 snackbarHostState = snackbarHostState,
                 onWatchRewardedAd = { activity?.let(homeViewModel::showRewardedAd) },
-                onProfileClick = { navController.navigate(Screen.Profile.route) },
+                onProfileClick = { navigateWithBreak(Screen.Profile.route) },
                 onSettingsClick = { navigateWithBreak(Screen.Settings.route) },
                 onAboutClick = { navigateWithBreak(Screen.About.route) }
             )
@@ -139,7 +140,8 @@ fun AppNavHost(
                 onSaveProfile = { name, photo -> authViewModel.updateProfile(name, photo) },
                 onVerifyEmail = authViewModel::sendEmailVerification,
                 onLogout = authViewModel::logout,
-                onDeleteAccount = authViewModel::deleteAccount,
+                onDeleteAccount = { password -> authViewModel.deleteAccount(password) },
+                onCancelReauth = authViewModel::cancelReauth,
                 onBackClick = { navController.popBackStack() }
             )
         }
@@ -153,6 +155,7 @@ fun AppNavHost(
                 settingsViewModel.events.collect { event ->
                     when (event) {
                         SettingsEvent.DataCleared -> snackbarHostState.showSnackbar("Settings reset")
+                        is SettingsEvent.Message -> snackbarHostState.showSnackbar(event.text)
                     }
                 }
             }
@@ -163,11 +166,10 @@ fun AppNavHost(
                 onThemeChange = settingsViewModel::setThemeMode,
                 onDynamicColorChange = settingsViewModel::setDynamicColor,
                 onNotificationsChange = settingsViewModel::setNotificationsEnabled,
-                onAdPersonalizationChange = settingsViewModel::setAdPersonalizationConsent,
                 onAdMobChange = settingsViewModel::setAdMobEnabled,
-                onUnityAdsChange = settingsViewModel::setUnityAdsEnabled,
                 onPrivacyOptionsClick = { activity?.let(settingsViewModel::openPrivacyOptions) },
                 onClearData = settingsViewModel::clearData,
+                onDeleteAccountClick = { navController.navigate(Screen.Profile.route) },
                 onBackClick = { navController.popBackStack() }
             )
         }

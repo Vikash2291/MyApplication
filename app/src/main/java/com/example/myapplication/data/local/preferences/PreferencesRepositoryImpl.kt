@@ -36,10 +36,8 @@ class PreferencesRepositoryImpl @Inject constructor(
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
-        val AD_PERSONALIZATION_CONSENT = booleanPreferencesKey("ad_personalization_consent")
         val GDPR_CONSENT = booleanPreferencesKey("gdpr_consent")
         val ADMOB_ENABLED = booleanPreferencesKey("admob_enabled")
-        val UNITY_ADS_ENABLED = booleanPreferencesKey("unity_ads_enabled")
         val REWARD_POINTS = intPreferencesKey("reward_points")
         val LAST_SYNC_TIME = longPreferencesKey("last_sync_time")
     }
@@ -55,10 +53,8 @@ class PreferencesRepositoryImpl @Inject constructor(
                 ?: ThemeMode.SYSTEM,
             dynamicColor = p[Keys.DYNAMIC_COLOR] ?: true,
             notificationsEnabled = p[Keys.NOTIFICATIONS_ENABLED] ?: true,
-            adPersonalizationConsent = p[Keys.AD_PERSONALIZATION_CONSENT] ?: false,
             gdprConsent = p[Keys.GDPR_CONSENT] ?: false,
             adMobEnabled = p[Keys.ADMOB_ENABLED] ?: true,
-            unityAdsEnabled = p[Keys.UNITY_ADS_ENABLED] ?: true,
             rewardPoints = p[Keys.REWARD_POINTS] ?: 0,
             lastSyncTime = p[Keys.LAST_SYNC_TIME] ?: 0L
         )
@@ -90,20 +86,12 @@ class PreferencesRepositoryImpl @Inject constructor(
         dataStore.edit { it[Keys.NOTIFICATIONS_ENABLED] = enabled }
     }
 
-    override suspend fun setAdPersonalizationConsent(consent: Boolean) {
-        dataStore.edit { it[Keys.AD_PERSONALIZATION_CONSENT] = consent }
-    }
-
     override suspend fun setGdprConsent(consent: Boolean) {
         dataStore.edit { it[Keys.GDPR_CONSENT] = consent }
     }
 
     override suspend fun setAdMobEnabled(enabled: Boolean) {
         dataStore.edit { it[Keys.ADMOB_ENABLED] = enabled }
-    }
-
-    override suspend fun setUnityAdsEnabled(enabled: Boolean) {
-        dataStore.edit { it[Keys.UNITY_ADS_ENABLED] = enabled }
     }
 
     override suspend fun addRewardPoints(points: Int) {

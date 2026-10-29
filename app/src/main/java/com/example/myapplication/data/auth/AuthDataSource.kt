@@ -15,6 +15,10 @@ interface AuthDataSource {
     suspend fun sendEmailVerification()
     suspend fun updateProfile(displayName: String?, photoUrl: String?): User
     suspend fun reload(): User?
+    /** Re-verifies the signed-in user's password (needed before deletion after an old sign-in). */
+    suspend fun reauthenticate(password: String)
+
+    /** Deletes the signed-in user. Throws [com.example.myapplication.domain.model.ReauthenticationRequiredException] if a recent sign-in is required. */
     suspend fun deleteUser()
     fun signOut()
 }

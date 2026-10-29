@@ -25,6 +25,7 @@ data class SettingsUiState(
 
 sealed interface SettingsEvent {
     data object DataCleared : SettingsEvent
+    data class Message(val text: String) : SettingsEvent
 }
 
 @HiltViewModel
@@ -46,11 +47,11 @@ class SettingsViewModel @Inject constructor(
     fun setThemeMode(mode: ThemeMode) = save { setThemeMode(mode) }
     fun setDynamicColor(enabled: Boolean) = save { setDynamicColor(enabled) }
     fun setNotificationsEnabled(enabled: Boolean) = save { setNotificationsEnabled(enabled) }
-    fun setAdPersonalizationConsent(consent: Boolean) = save { setAdPersonalizationConsent(consent) }
     fun setAdMobEnabled(enabled: Boolean) = save { setAdMobEnabled(enabled) }
-    fun setUnityAdsEnabled(enabled: Boolean) = save { setUnityAdsEnabled(enabled) }
 
-    fun openPrivacyOptions(activity: Activity) = adsManager.showPrivacyOptionsForm(activity)
+    fun openPrivacyOptions(activity: Activity) = adsManager.showPrivacyOptionsForm(activity) { error ->
+        if (error != null) viewModelScope.launch { _events.send(SettingsEvent.Message("Couldn't open privacy options: $error")) }
+    }
 
     fun clearData() {
         viewModelScope.launch {

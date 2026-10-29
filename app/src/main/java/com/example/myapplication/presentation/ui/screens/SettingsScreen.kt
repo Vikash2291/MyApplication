@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PrivacyTip
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -52,11 +51,10 @@ fun SettingsScreen(
     onThemeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onNotificationsChange: (Boolean) -> Unit,
-    onAdPersonalizationChange: (Boolean) -> Unit,
     onAdMobChange: (Boolean) -> Unit,
-    onUnityAdsChange: (Boolean) -> Unit,
     onPrivacyOptionsClick: () -> Unit,
     onClearData: () -> Unit,
+    onDeleteAccountClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
     val s = uiState.settings
@@ -111,18 +109,15 @@ fun SettingsScreen(
             SectionHeader("Ads & privacy")
             AppCard {
                 Column(Modifier.padding(16.dp)) {
-                    SwitchRow(
-                        Icons.Default.PrivacyTip, "Personalized ads",
-                        "Allow ad partners to use data for relevant ads",
-                        s.adPersonalizationConsent, onAdPersonalizationChange
-                    )
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                    SwitchRow(Icons.Default.AdUnits, "Google AdMob", "Primary ad network", s.adMobEnabled, onAdMobChange)
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                    SwitchRow(Icons.Default.VideoLibrary, "Unity Ads", "Backup ad network", s.unityAdsEnabled, onUnityAdsChange)
+                    SwitchRow(Icons.Default.AdUnits, "Ads", "Banner, interstitial and app open ads (via AdMob)", s.adMobEnabled, onAdMobChange)
+                    // Required by UMP when the user is in a regulated region (e.g. EEA/UK, US states).
                     if (uiState.isPrivacyOptionsRequired) {
                         HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                        TextButton(onClick = onPrivacyOptionsClick) { Text("Manage consent (GDPR)") }
+                        TextButton(onClick = onPrivacyOptionsClick) {
+                            Icon(Icons.Default.PrivacyTip, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Privacy options")
+                        }
                     }
                 }
             }
@@ -134,6 +129,11 @@ fun SettingsScreen(
                         Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                         Spacer(Modifier.width(8.dp))
                         Text("Reset all settings", color = MaterialTheme.colorScheme.error)
+                    }
+                    TextButton(onClick = onDeleteAccountClick) {
+                        Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete account…", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }

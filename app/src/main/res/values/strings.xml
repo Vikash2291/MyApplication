@@ -6,15 +6,15 @@
 
     <!--
         Ad unit IDs. These are Google's official TEST IDs, safe for development.
-        Replace with your own IDs from the AdMob console before publishing.
+        Release builds override these in app/src/release/res/values/ads.xml.
         The AdMob APP ID is set in app/build.gradle.kts (manifestPlaceholders / ADMOB_APP_ID).
     -->
     <string name="admob_banner_ad_unit_id" translatable="false">ca-app-pub-3940256099942544/9214589741</string>
     <string name="admob_interstitial_ad_unit_id" translatable="false">ca-app-pub-3940256099942544/1033173712</string>
     <string name="admob_rewarded_ad_unit_id" translatable="false">ca-app-pub-3940256099942544/5224354917</string>
 
-    <!-- Unity Ads (fallback network). Leave game id empty to disable Unity. -->
-    <string name="unity_game_id" translatable="false"></string>
-    <string name="unity_rewarded_placement_id" translatable="false">Rewarded_Android</string>
-    <string name="unity_interstitial_placement_id" translatable="false">Interstitial_Android</string>
+    <string name="admob_app_open_ad_unit_id" translatable="false">ca-app-pub-3940256099942544/9257395921</string>
+
+    <!-- Unity Ads is NOT configured here: it serves as a bidding source inside AdMob Mediation
+         (AdMob console > Mediation > mediation group > Unity Ads bidding). -->
 </resources>

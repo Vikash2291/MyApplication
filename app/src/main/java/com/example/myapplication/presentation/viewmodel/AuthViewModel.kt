@@ -3,6 +3,7 @@ package com.example.myapplication.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.domain.model.AuthResult
+import com.example.myapplication.domain.model.ReauthenticationRequiredException
 import com.example.myapplication.domain.model.Result
 import com.example.myapplication.domain.model.User
 import com.example.myapplication.domain.usecase.DeleteAccountUseCase
@@ -27,7 +28,9 @@ import javax.inject.Inject
 data class AuthUiState(
     val isLoading: Boolean = false,
     val user: User? = null,
-    val error: String? = null
+    val error: String? = null,
+    /** Account deletion needs the password again (Firebase "requires recent login"). */
+    val isReauthRequired: Boolean = false
 ) {
     val isLoggedIn: Boolean get() = user != null
 }
@@ -77,16 +80,23 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun deleteAccount() = launchWithLoading {
-        when (val result = deleteAccountUseCase()) {
+    /** Deletes the account; pass [password] when [AuthUiState.isReauthRequired] asked for it. */
+    fun deleteAccount(password: String? = null) = launchWithLoading {
+        when (val result = deleteAccountUseCase(password)) {
             is Result.Success -> {
                 _uiState.update { AuthUiState() }
                 _events.send(AuthEvent.ShowMessage("Account deleted"))
                 _events.send(AuthEvent.NavigateToLogin)
             }
-            is Result.Error -> setError(result.message)
+            is Result.Error -> if (result.exception is ReauthenticationRequiredException) {
+                _uiState.update { it.copy(isReauthRequired = true, error = null) }
+            } else {
+                setError(result.message)
+            }
         }
     }
+
+    fun cancelReauth() = _uiState.update { it.copy(isReauthRequired = false) }
 
     fun sendPasswordReset(email: String) = launchWithLoading {
         when (val result = sendPasswordResetUseCase(email)) {

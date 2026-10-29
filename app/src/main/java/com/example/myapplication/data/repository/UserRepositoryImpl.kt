@@ -1,6 +1,7 @@
 package com.example.myapplication.data.repository
 
 import com.example.myapplication.data.auth.AuthDataSource
+import com.example.myapplication.data.local.database.dao.SettingsDao
 import com.example.myapplication.data.local.database.dao.UserDao
 import com.example.myapplication.data.local.database.entity.toDomain
 import com.example.myapplication.data.local.database.entity.toEntity
@@ -17,6 +18,7 @@ class UserRepositoryImpl @Inject constructor(
     private val authDataSource: AuthDataSource,
     private val apiService: ApiService,
     private val userDao: UserDao,
+    private val settingsDao: SettingsDao,
     private val preferencesRepository: PreferencesRepository
 ) : UserRepository {
 
@@ -47,12 +49,16 @@ class UserRepositoryImpl @Inject constructor(
         Result.Success(fresh)
     }
 
-    override suspend fun deleteAccount(): Result<Unit> = safeCall("Failed to delete account") {
+    override suspend fun deleteAccount(password: String?): Result<Unit> = safeCall("Failed to delete account") {
+        if (password != null) authDataSource.reauthenticate(password)
+        // Best effort: let the optional backend erase server-side data while the token is valid.
         runCatching { apiService.deleteAccount() }
         authDataSource.deleteUser()
-        authDataSource.signOut()
+        // Only wipe local data once the identity provider confirmed the deletion.
         userDao.clearAllUsers()
-        preferencesRepository.clearSession()
+        settingsDao.clearAllSettings()
+        preferencesRepository.clearAll()
+        authDataSource.signOut()
         Result.Success(Unit)
     }
 }

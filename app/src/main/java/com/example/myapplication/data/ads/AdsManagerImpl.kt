@@ -18,12 +18,6 @@ import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
-import com.unity3d.ads.IUnityAdsInitializationListener
-import com.unity3d.ads.IUnityAdsLoadListener
-import com.unity3d.ads.IUnityAdsShowListener
-import com.unity3d.ads.UnityAds
-import com.unity3d.ads.UnityAdsShowOptions
-import com.unity3d.ads.metadata.MetaData
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,16 +32,24 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * AdMob Mediation only. Unity Ads participates as a bidding ad source through the
+ * `com.google.ads.mediation:unity` adapter and is configured in the AdMob dashboard
+ * (mediation group), so there is no Unity-specific code or placement handling here.
+ */
 @Singleton
 class AdsManagerImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val preferencesRepository: PreferencesRepository
+    private val preferencesRepository: PreferencesRepository,
+    private val appOpenAdManager: AppOpenAdManager,
+    private val fullScreenTracker: FullScreenAdTracker
 ) : AdsManager {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val consentInformation: ConsentInformation =
         UserMessagingPlatform.getConsentInformation(context)
     private val sdkInitStarted = AtomicBoolean(false)
+    private val interstitialPacer = InterstitialPacer(clock = SystemClock::elapsedRealtime)
 
     private val _state = MutableStateFlow(AdsState())
     override val state: StateFlow<AdsState> = _state.asStateFlow()
@@ -58,35 +60,28 @@ class AdsManagerImpl @Inject constructor(
     private var interstitialAd: InterstitialAd? = null
     private var isLoadingRewarded = false
     private var isLoadingInterstitial = false
-    private var unityInitialized = false
-    private var unityRewardedLoaded = false
-    private var unityInterstitialLoaded = false
-    private var lastInterstitialShownAt = 0L
-    private var isShowingFullScreenAd = false
 
     private val rewardedUnitId get() = context.getString(R.string.admob_rewarded_ad_unit_id)
     private val interstitialUnitId get() = context.getString(R.string.admob_interstitial_ad_unit_id)
-    private val unityGameId get() = context.getString(R.string.unity_game_id)
-    private val unityRewardedPlacement get() = context.getString(R.string.unity_rewarded_placement_id)
-    private val unityInterstitialPlacement get() = context.getString(R.string.unity_interstitial_placement_id)
 
     override val bannerAdUnitId: String get() = context.getString(R.string.admob_banner_ad_unit_id)
-    override val bannersEnabled: Boolean get() = settings.adMobEnabled && _state.value.canRequestAds
+    override val isFullScreenAdShowing: Boolean get() = fullScreenTracker.isShowing
+
+    private val adsAllowed: Boolean get() = settings.adMobEnabled && _state.value.canRequestAds
 
     init {
         scope.launch {
             preferencesRepository.settings.collect { newSettings ->
-                val networksChanged = newSettings.adMobEnabled != settings.adMobEnabled ||
-                    newSettings.unityAdsEnabled != settings.unityAdsEnabled
+                val enabledChanged = newSettings.adMobEnabled != settings.adMobEnabled
                 settings = newSettings
-                if (newSettings.adMobEnabled) {
-                    // nothing to do: AdMob ads load lazily
-                } else {
+                if (!newSettings.adMobEnabled) {
                     rewardedAd = null
                     interstitialAd = null
                 }
-                applyUnityConsent()
-                if (networksChanged && _state.value.isInitialized) preloadAds()
+                if (enabledChanged && _state.value.isInitialized) {
+                    appOpenAdManager.setEnabled(adsAllowed)
+                    preloadAds()
+                }
                 refreshReadiness()
             }
         }
@@ -99,6 +94,7 @@ class AdsManagerImpl @Inject constructor(
             .setTagForUnderAgeOfConsent(false)
             .build()
 
+        // Required on every launch: refreshes consent status and privacy-options requirement.
         consentInformation.requestConsentInfoUpdate(
             activity,
             params,
@@ -114,14 +110,15 @@ class AdsManagerImpl @Inject constructor(
             }
         )
 
-        // Consent obtained in a previous session lets us start immediately.
-        if (consentInformation.canRequestAds()) onConsentResolved()
+        // Consent obtained in a previous session lets ads start loading in parallel.
+        if (consentInformation.canRequestAds()) initializeIfAllowed()
     }
 
-    override fun showPrivacyOptionsForm(activity: Activity) {
+    override fun showPrivacyOptionsForm(activity: Activity, onDismissed: (error: String?) -> Unit) {
         UserMessagingPlatform.showPrivacyOptionsForm(activity) { error ->
             error?.let { Timber.w("Privacy options error: %s", it.message) }
             onConsentResolved()
+            onDismissed(error?.message)
         }
     }
 
@@ -129,58 +126,42 @@ class AdsManagerImpl @Inject constructor(
         val canRequest = consentInformation.canRequestAds()
         _state.update {
             it.copy(
+                isConsentResolved = true,
                 canRequestAds = canRequest,
                 isPrivacyOptionsRequired = consentInformation.privacyOptionsRequirementStatus ==
                     ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED
             )
         }
-        scope.launch {
-            preferencesRepository.setGdprConsent(canRequest)
+        scope.launch { preferencesRepository.setGdprConsent(canRequest) }
+        if (canRequest) {
+            initializeIfAllowed()
+        } else {
+            // Consent withdrawn: drop anything cached so nothing is shown.
+            rewardedAd = null
+            interstitialAd = null
+            appOpenAdManager.setEnabled(false)
+            refreshReadiness()
         }
-        if (canRequest && sdkInitStarted.compareAndSet(false, true)) initializeSdks()
     }
 
-    private fun initializeSdks() {
-        MobileAds.initialize(context) {
-            Timber.d("AdMob initialised")
-            _state.update { it.copy(isInitialized = true) }
-            preloadAds()
+    private fun initializeIfAllowed() {
+        _state.update { it.copy(canRequestAds = true) }
+        if (!sdkInitStarted.compareAndSet(false, true)) {
+            if (_state.value.isInitialized) {
+                appOpenAdManager.setEnabled(adsAllowed)
+                preloadAds()
+            }
+            return
         }
-        initializeUnity()
-    }
-
-    private fun initializeUnity() {
-        if (unityGameId.isBlank() || UnityAds.isInitialized) return
-        applyUnityConsent()
-        UnityAds.initialize(
-            context,
-            unityGameId,
-            com.example.myapplication.BuildConfig.DEBUG,
-            object : IUnityAdsInitializationListener {
-                override fun onInitializationComplete() {
-                    unityInitialized = true
-                    loadUnityAds()
+        // MobileAds.initialize does disk/network work: start it off the main thread.
+        CoroutineScope(Dispatchers.IO).launch {
+            MobileAds.initialize(context) {
+                scope.launch {
+                    Timber.d("Mobile Ads initialised (mediation adapters included)")
+                    _state.update { it.copy(isInitialized = true) }
+                    appOpenAdManager.setEnabled(adsAllowed)
+                    preloadAds()
                 }
-
-                override fun onInitializationFailed(
-                    error: UnityAds.UnityAdsInitializationError?,
-                    message: String?
-                ) {
-                    Timber.w("Unity Ads init failed: %s %s", error, message)
-                }
-            }
-        )
-    }
-
-    private fun applyUnityConsent() {
-        runCatching {
-            MetaData(context).apply {
-                set("gdpr.consent", settings.gdprConsent && settings.adPersonalizationConsent)
-                commit()
-            }
-            MetaData(context).apply {
-                set("privacy.consent", settings.adPersonalizationConsent)
-                commit()
             }
         }
     }
@@ -190,12 +171,9 @@ class AdsManagerImpl @Inject constructor(
     // region Loading
 
     override fun preloadAds() {
-        if (!_state.value.canRequestAds) return
-        if (settings.adMobEnabled) {
-            loadRewarded()
-            loadInterstitial()
-        }
-        loadUnityAds()
+        if (!_state.value.isInitialized || !adsAllowed) return
+        loadRewarded()
+        loadInterstitial()
     }
 
     private fun adRequest(): AdRequest = AdRequest.Builder().build()
@@ -238,36 +216,11 @@ class AdsManagerImpl @Inject constructor(
         })
     }
 
-    private fun loadUnityAds() {
-        if (!unityInitialized || !settings.unityAdsEnabled) return
-        if (!unityRewardedLoaded) loadUnityPlacement(unityRewardedPlacement) { unityRewardedLoaded = it }
-        if (!unityInterstitialLoaded) loadUnityPlacement(unityInterstitialPlacement) { unityInterstitialLoaded = it }
-    }
-
-    private fun loadUnityPlacement(placementId: String, onLoaded: (Boolean) -> Unit) {
-        UnityAds.load(placementId, object : IUnityAdsLoadListener {
-            override fun onUnityAdsAdLoaded(placementId: String?) {
-                scope.launch { onLoaded(true); refreshReadiness() }
-            }
-
-            override fun onUnityAdsFailedToLoad(
-                placementId: String?,
-                error: UnityAds.UnityAdsLoadError?,
-                message: String?
-            ) {
-                Timber.d("Unity load failed for %s: %s", placementId, message)
-                scope.launch { onLoaded(false); refreshReadiness() }
-            }
-        })
-    }
-
     private fun refreshReadiness() {
         _state.update {
             it.copy(
-                isRewardedReady = (settings.adMobEnabled && rewardedAd != null) ||
-                    (settings.unityAdsEnabled && unityRewardedLoaded),
-                isInterstitialReady = (settings.adMobEnabled && interstitialAd != null) ||
-                    (settings.unityAdsEnabled && unityInterstitialLoaded)
+                isRewardedReady = adsAllowed && rewardedAd != null,
+                isInterstitialReady = adsAllowed && interstitialAd != null
             )
         }
     }
@@ -277,22 +230,13 @@ class AdsManagerImpl @Inject constructor(
     // region Showing
 
     override fun showRewardedAd(activity: Activity, onResult: (RewardOutcome) -> Unit) {
-        if (isShowingFullScreenAd) return
-        val ad = rewardedAd.takeIf { settings.adMobEnabled }
-        when {
-            ad != null -> showAdMobRewarded(activity, ad, onResult)
-            settings.unityAdsEnabled && unityRewardedLoaded -> showUnity(activity, unityRewardedPlacement) { completed ->
-                unityRewardedLoaded = false
-                onResult(if (completed) RewardOutcome.Earned(DEFAULT_REWARD) else RewardOutcome.Skipped)
-            }
-            else -> {
-                preloadAds()
-                onResult(RewardOutcome.Unavailable("No ad available right now. Please try again shortly."))
-            }
+        if (fullScreenTracker.isShowing) return
+        val ad = rewardedAd.takeIf { adsAllowed }
+        if (ad == null) {
+            preloadAds()
+            onResult(RewardOutcome.Unavailable("No video available right now. Please try again shortly."))
+            return
         }
-    }
-
-    private fun showAdMobRewarded(activity: Activity, ad: RewardedAd, onResult: (RewardOutcome) -> Unit) {
         var earned: Int? = null
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() {
@@ -306,83 +250,40 @@ class AdsManagerImpl @Inject constructor(
             }
         }
         rewardedAd = null
-        isShowingFullScreenAd = true
+        fullScreenTracker.setShowing(true)
         refreshReadiness()
         ad.show(activity) { reward -> earned = reward.amount.takeIf { it > 0 } ?: DEFAULT_REWARD }
     }
 
-    override fun showInterstitialAd(activity: Activity, force: Boolean, onDismissed: () -> Unit) {
-        val now = SystemClock.elapsedRealtime()
-        val capped = !force && lastInterstitialShownAt != 0L &&
-            now - lastInterstitialShownAt < INTERSTITIAL_MIN_INTERVAL_MS
-        if (capped || isShowingFullScreenAd) {
-            onDismissed()
+    override fun onNaturalBreak(activity: Activity, onContinue: () -> Unit) {
+        interstitialPacer.recordUserAction()
+        val ad = interstitialAd.takeIf { adsAllowed }
+        if (ad == null || fullScreenTracker.isShowing || !interstitialPacer.canShow()) {
+            if (ad == null) preloadAds()
+            onContinue()
             return
         }
-
-        val ad = interstitialAd.takeIf { settings.adMobEnabled }
-        when {
-            ad != null -> {
-                ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-                    override fun onAdDismissedFullScreenContent() {
-                        finishFullScreen()
-                        onDismissed()
-                    }
-
-                    override fun onAdFailedToShowFullScreenContent(error: AdError) {
-                        finishFullScreen()
-                        onDismissed()
-                    }
-                }
-                interstitialAd = null
-                isShowingFullScreenAd = true
-                lastInterstitialShownAt = now
-                refreshReadiness()
-                ad.show(activity)
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+                finishFullScreen()
+                onContinue()
             }
-            settings.unityAdsEnabled && unityInterstitialLoaded -> {
-                lastInterstitialShownAt = now
-                showUnity(activity, unityInterstitialPlacement) {
-                    unityInterstitialLoaded = false
-                    onDismissed()
-                }
-            }
-            else -> {
-                preloadAds()
-                onDismissed()
+
+            override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                finishFullScreen()
+                onContinue()
             }
         }
-    }
-
-    private fun showUnity(activity: Activity, placementId: String, onFinished: (completed: Boolean) -> Unit) {
-        isShowingFullScreenAd = true
+        interstitialAd = null
+        fullScreenTracker.setShowing(true)
+        interstitialPacer.onShown()
         refreshReadiness()
-        UnityAds.show(activity, placementId, UnityAdsShowOptions(), object : IUnityAdsShowListener {
-            override fun onUnityAdsShowFailure(
-                placementId: String?,
-                error: UnityAds.UnityAdsShowError?,
-                message: String?
-            ) {
-                scope.launch { finishFullScreen(); onFinished(false) }
-            }
-
-            override fun onUnityAdsShowStart(placementId: String?) = Unit
-            override fun onUnityAdsShowClick(placementId: String?) = Unit
-
-            override fun onUnityAdsShowComplete(
-                placementId: String?,
-                state: UnityAds.UnityAdsShowCompletionState?
-            ) {
-                scope.launch {
-                    finishFullScreen()
-                    onFinished(state == UnityAds.UnityAdsShowCompletionState.COMPLETED)
-                }
-            }
-        })
+        ad.show(activity)
     }
 
+    /** Clears the full-screen flag and immediately loads the next ad of each format. */
     private fun finishFullScreen() {
-        isShowingFullScreenAd = false
+        fullScreenTracker.setShowing(false)
         refreshReadiness()
         preloadAds()
     }
@@ -391,6 +292,5 @@ class AdsManagerImpl @Inject constructor(
 
     private companion object {
         const val DEFAULT_REWARD = 10
-        const val INTERSTITIAL_MIN_INTERVAL_MS = 120_000L // at most one interstitial every 2 minutes
     }
 }

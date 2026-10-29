@@ -78,8 +78,11 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /** Call at natural breaks (e.g. leaving a screen); the manager applies a frequency cap. */
-    fun maybeShowInterstitial(activity: Activity, onContinue: () -> Unit) {
-        adsManager.showInterstitialAd(activity, onDismissed = onContinue)
+    /**
+     * Call after a user action that ends at a natural break (e.g. leaving Home for another
+     * screen). AdsManager counts the action and applies the interstitial pacing rules.
+     */
+    fun onNaturalBreak(activity: Activity, onContinue: () -> Unit) {
+        adsManager.onNaturalBreak(activity, onContinue)
     }
 }

@@ -8,10 +8,8 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val dynamicColor: Boolean = true,
     val notificationsEnabled: Boolean = true,
-    val adPersonalizationConsent: Boolean = false,
     val gdprConsent: Boolean = false,
     val adMobEnabled: Boolean = true,
-    val unityAdsEnabled: Boolean = true,
     val rewardPoints: Int = 0,
     val lastSyncTime: Long = 0L
 )
@@ -26,10 +24,8 @@ interface PreferencesRepository {
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setDynamicColor(enabled: Boolean)
     suspend fun setNotificationsEnabled(enabled: Boolean)
-    suspend fun setAdPersonalizationConsent(consent: Boolean)
     suspend fun setGdprConsent(consent: Boolean)
     suspend fun setAdMobEnabled(enabled: Boolean)
-    suspend fun setUnityAdsEnabled(enabled: Boolean)
     suspend fun addRewardPoints(points: Int)
     suspend fun updateLastSyncTime(time: Long = System.currentTimeMillis())
 

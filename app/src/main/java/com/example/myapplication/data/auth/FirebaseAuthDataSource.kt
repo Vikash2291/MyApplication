@@ -2,9 +2,12 @@ package com.example.myapplication.data.auth
 
 import android.content.Context
 import android.net.Uri
+import com.example.myapplication.domain.model.ReauthenticationRequiredException
 import com.example.myapplication.domain.model.User
 import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.userProfileChangeRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -87,7 +90,17 @@ class FirebaseAuthDataSource @Inject constructor(
 
     override suspend fun deleteUser() {
         val user = requireAuth().currentUser ?: error("No user signed in")
-        user.delete().await()
+        try {
+            user.delete().await()
+        } catch (e: FirebaseAuthRecentLoginRequiredException) {
+            throw ReauthenticationRequiredException()
+        }
+    }
+
+    override suspend fun reauthenticate(password: String) {
+        val user = requireAuth().currentUser ?: error("No user signed in")
+        val email = user.email ?: error("This account has no email address")
+        user.reauthenticate(EmailAuthProvider.getCredential(email, password)).await()
     }
 
     override fun signOut() {

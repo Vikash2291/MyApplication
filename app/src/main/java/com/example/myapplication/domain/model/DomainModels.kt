@@ -20,6 +20,14 @@ data class AuthResult(
     val expiresIn: Long = 0L
 )
 
+/**
+ * Thrown when a sensitive operation (e.g. account deletion) needs the user to confirm their
+ * password again because the last sign-in is too old.
+ */
+class ReauthenticationRequiredException(
+    message: String = "For your security, please enter your password again to continue."
+) : Exception(message)
+
 /** UI theme selection persisted in preferences. */
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 

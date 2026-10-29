@@ -11,6 +11,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.Configuration
 import com.example.myapplication.core.common.Constants
+import com.example.myapplication.data.ads.AppOpenAdManager
 import com.example.myapplication.utils.SyncWorker
 import com.google.firebase.FirebaseApp
 import com.google.firebase.analytics.FirebaseAnalytics
@@ -23,6 +24,7 @@ import javax.inject.Inject
 class MyApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var appOpenAdManager: AppOpenAdManager
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -54,6 +56,9 @@ class MyApplication : Application(), Configuration.Provider {
         } else {
             Timber.w("Firebase not configured: add app/google-services.json to enable auth & analytics")
         }
+
+        // App open ads stay disabled until UMP consent allows requests (see AdsManagerImpl).
+        appOpenAdManager.register(this)
 
         createNotificationChannels()
         SyncWorker.schedule(this)

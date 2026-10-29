@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,7 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.presentation.ui.components.AdaptiveBannerAd
+import com.example.myapplication.presentation.ui.components.AdaptiveBannerSlot
 import com.example.myapplication.presentation.ui.components.AppCard
 import com.example.myapplication.presentation.ui.components.AppTopBar
 import com.example.myapplication.presentation.ui.components.PrimaryButton
@@ -63,8 +62,9 @@ fun HomeScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
+            // Fixed-height slot at the very bottom, separated from the buttons above it.
             if (uiState.showBanner && uiState.bannerAdUnitId.isNotBlank()) {
-                AdaptiveBannerAd(uiState.bannerAdUnitId, Modifier.navigationBarsPadding())
+                AdaptiveBannerSlot(uiState.bannerAdUnitId)
             }
         }
     ) { padding ->
@@ -101,9 +101,9 @@ fun HomeScreen(
                         Icon(Icons.Default.PlayCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("Bonus points", style = MaterialTheme.typography.titleMedium)
+                            Text("Bonus points (optional)", style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "Watch a short video to get bonus points.",
+                                "Optional: watch a short video ad to earn bonus points.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -111,7 +111,7 @@ fun HomeScreen(
                     }
                     Spacer(Modifier.size(16.dp))
                     PrimaryButton(
-                        text = if (uiState.isRewardedAdReady) "Watch video" else "Loading video…",
+                        text = if (uiState.isRewardedAdReady) "Watch video for points" else "Loading video…",
                         onClick = onWatchRewardedAd,
                         enabled = uiState.isRewardedAdReady,
                         modifier = Modifier.fillMaxWidth()
