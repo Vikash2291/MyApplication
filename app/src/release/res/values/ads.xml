@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Production AdMob ad units (release builds only). Debug builds keep Google's test IDs
+     from src/main so developers never generate invalid traffic on the live account. -->
+<resources>
+    <string name="admob_banner_ad_unit_id" translatable="false">ca-app-pub-8988139914000617/8402772539</string>
+    <string name="admob_interstitial_ad_unit_id" translatable="false">ca-app-pub-8988139914000617/1837364180</string>
+    <string name="admob_rewarded_ad_unit_id" translatable="false">ca-app-pub-8988139914000617/2336891781</string>
+</resources>

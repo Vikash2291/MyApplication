@@ -25,7 +25,7 @@ keystore.properties
 *.jks
 
 # Firebase config (add your own locally / via CI secret)
-app/google-services.json
+# app/google-services.json  (committed: Firebase Android config is not secret; restrict API key by package+SHA in Google Cloud)
 
 # Logs
 *.log

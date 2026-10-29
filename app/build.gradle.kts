@@ -29,7 +29,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "com.alfred.myapplication"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
@@ -40,7 +40,7 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"https://api.example.com/\"")
         buildConfigField("boolean", "FIREBASE_CONFIGURED", hasGoogleServices.toString())
 
-        // Google's official test IDs. Replace for production via gradle properties or here.
+        // Google's official test App ID for debug builds; release overrides below.
         manifestPlaceholders["admobAppId"] =
             (project.findProperty("ADMOB_APP_ID") as String?) ?: "ca-app-pub-3940256099942544~3347511713"
     }
@@ -63,6 +63,9 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
+            // Production AdMob App ID (publisher pub-8988139914000617)
+            manifestPlaceholders["admobAppId"] =
+                (project.findProperty("ADMOB_APP_ID") as String?) ?: "ca-app-pub-8988139914000617~3342017543"
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
