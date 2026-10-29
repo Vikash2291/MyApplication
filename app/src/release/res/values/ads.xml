@@ -5,7 +5,6 @@
     <string name="admob_banner_ad_unit_id" translatable="false">ca-app-pub-8988139914000617/8402772539</string>
     <string name="admob_interstitial_ad_unit_id" translatable="false">ca-app-pub-8988139914000617/1837364180</string>
     <string name="admob_rewarded_ad_unit_id" translatable="false">ca-app-pub-8988139914000617/2336891781</string>
-    <!-- TODO(owner): create an "App open" ad unit in the AdMob console and paste its ID here.
          Until then this is Google's TEST app open unit, so release builds show no live app open ads. -->
-    <string name="admob_app_open_ad_unit_id" translatable="false">ca-app-pub-3940256099942544/9257395921</string>
+    <string name="admob_app_open_ad_unit_id" translatable="false">ca-app-pub-8988139914000617/8552227608</string>
 </resources>
