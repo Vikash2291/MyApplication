@@ -1,4 +1,4 @@
-package com.example.myapplication.data.local.database
+package com.example.myapplication.data.local.database.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -18,13 +18,13 @@ interface UserDao {
     suspend fun updateUser(user: UserEntity)
 
     @Query("SELECT * FROM users WHERE id = :userId")
-    fun getUserById(userId: String): Flow<UserEntity?>
+    fun observeUser(userId: String): Flow<UserEntity?>
 
     @Query("SELECT * FROM users WHERE id = :userId")
-    suspend fun getUserByIdSync(userId: String): UserEntity?
+    suspend fun getUserById(userId: String): UserEntity?
 
     @Query("SELECT * FROM users ORDER BY lastLoginAt DESC LIMIT 1")
-    fun getLastLoggedInUser(): Flow<UserEntity?>
+    fun observeLastLoggedInUser(): Flow<UserEntity?>
 
     @Query("DELETE FROM users WHERE id = :userId")
     suspend fun deleteUser(userId: String)
@@ -38,16 +38,13 @@ interface SettingsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSetting(setting: SettingsEntity)
 
-    @Query("SELECT * FROM settings WHERE key = :key")
-    suspend fun getSetting(key: String): SettingsEntity?
-
-    @Query("SELECT value FROM settings WHERE key = :key")
+    @Query("SELECT value FROM settings WHERE `key` = :key")
     suspend fun getSettingValue(key: String): String?
 
     @Query("SELECT * FROM settings")
-    fun getAllSettings(): Flow<List<SettingsEntity>>
+    fun observeAllSettings(): Flow<List<SettingsEntity>>
 
-    @Query("DELETE FROM settings WHERE key = :key")
+    @Query("DELETE FROM settings WHERE `key` = :key")
     suspend fun deleteSetting(key: String)
 
     @Query("DELETE FROM settings")

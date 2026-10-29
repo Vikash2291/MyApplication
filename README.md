@@ -44,7 +44,7 @@ Presentation Layer
 | Category | Technology |
 |----------|------------|
 | **Language** | Kotlin 1.9.23 |
-| **Build** | Gradle 8.5 (KTS) + Version Catalogs |
+| **Build** | Gradle 8.7 (KTS) + Version Catalogs |
 | **Architecture** | Clean Architecture + MVVM |
 | **DI** | Hilt 2.48 |
 | **Async** | Coroutines + Flow |
@@ -55,7 +55,7 @@ Presentation Layer
 | **Auth** | Firebase Auth |
 | **Analytics/Crashlytics** | Firebase Analytics + Crashlytics |
 | **Ads** | AdMob + Unity LevelPlay (Bidding Mediation) |
-| **Testing** | JUnit 5, MockK, Turbine, Robolectric, Compose Testing |
+| **Testing** | JUnit 4, MockK, Truth, Coroutines Test, Compose UI Test |
 | **Static Analysis** | Detekt |
 | **CI/CD** | GitHub Actions |
 
@@ -69,7 +69,7 @@ Presentation Layer
 - ✅ **Consent Management** - UMP (User Messaging Platform) for GDPR/CCPA
 - ✅ **Analytics** - Firebase Analytics + Crashlytics
 - ✅ **Push Notifications** - FCM ready
-- ✅ **Background Sync** - WorkManager + Foreground Service
+- ✅ **Background Sync** - WorkManager (Hilt worker, every 6h)
 - ✅ **Theming** - Light/Dark/System + Material3 dynamic colors
 - ✅ **CI/CD** - Automated lint, test, build, release
 
@@ -77,63 +77,41 @@ Presentation Layer
 
 ### Prerequisites
 
-- Android Studio Koala (2024.1.1)+ or IntelliJ IDEA
+- Android Studio Koala (2024.1.1)+
 - JDK 17
-- Android SDK 34 (compileSdk) / minSdk 24
+- Android SDK 34
 
 ### Setup
 
 ```bash
-# Clone repository
-git clone <repository-url>
+git clone https://github.com/Vikash2291/MyApplication.git
 cd MyApplication
-
-# Create local.properties with SDK path
-echo "sdk.dir=/path/to/your/android/sdk" > local.properties
-
-# Add your API keys to strings.xml (or use build config)
-# Edit app/src/main/res/values/strings.xml:
-# - YOUR_ADMOB_APP_ID
-# - YOUR_ADMOB_REWARDED_AD_UNIT_ID
-# - YOUR_ADMOB_INTERSTITIAL_AD_UNIT_ID
-# - YOUR_UNITY_GAME_ID
-
-# Build debug APK
-./gradlew assembleDebug
-
-# Run tests
-./gradlew test
-
-# Run lint + detekt
-./gradlew lint detekt
+./gradlew assembleDebug      # builds with Google test ad IDs, Firebase disabled
+./gradlew testDebugUnitTest  # unit tests
 ```
 
-### Configuration Files
+The app builds and runs **without** any keys:
+- Ads use Google's official test ad unit IDs.
+- Without `app/google-services.json`, Firebase plugins are skipped and login shows
+  "Firebase is not configured".
 
-| File | Purpose |
-|------|---------|
-| `local.properties` | SDK path (gitignored) |
-| `gradle.properties` | JVM args, caching, build config |
-| `gradle/libs.versions.toml` | Centralized dependency versions |
-| `app/src/main/res/values/strings.xml` | API keys, ad unit IDs |
-| `release.keystore` | Release signing (gitignored) |
+### Going to production
 
-## 🔑 Required API Keys
+| What | Where |
+|------|-------|
+| Firebase (Auth, Analytics, Crashlytics, FCM) | Create a Firebase project, enable Email/Password auth, put `google-services.json` in `app/` |
+| AdMob App ID | `./gradlew assembleRelease -PADMOB_APP_ID=ca-app-pub-xxx~yyy` (or edit `manifestPlaceholders` in `app/build.gradle.kts`) |
+| AdMob ad unit IDs | `app/src/main/res/values/strings.xml` |
+| Unity Ads (fallback) | `unity_game_id` in `strings.xml` (empty = disabled) |
+| Backend (optional) | `API_BASE_URL` in `app/build.gradle.kts`; all backend calls are best-effort |
+| Release signing | `release.keystore` in project root + `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` env vars or `keystore.properties` |
 
-Before building release, add these to `app/src/main/res/values/strings.xml`:
-
-```xml
-<!-- AdMob -->
-<string name="admob_app_id">ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX</string>
-<string name="admob_rewarded_ad_unit_id">ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX</string>
-<string name="admob_interstitial_ad_unit_id">ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX</string>
-<string name="admob_banner_ad_unit_id">ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX</string>
-
-<!-- Unity Ads / LevelPlay -->
-<string name="unity_game_id">XXXXXXXX</string>
-```
-
-And add `google-services.json` to `app/` for Firebase.
+### Ads strategy built in
+- **Rewarded video** on Home grants reward points (user-initiated, policy-safe).
+- **Interstitial** only at a natural break (leaving Home for Settings/About), capped to one per 2 minutes.
+- **Adaptive anchored banner** at the bottom of Home.
+- **UMP consent** form before any ad request; privacy options in Settings when required (GDPR).
+- AdMob primary, Unity Ads fallback; both can be toggled in Settings.
 
 ## 🧪 Testing
 

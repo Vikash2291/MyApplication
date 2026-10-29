@@ -1,125 +1,65 @@
 package com.example.myapplication.presentation.viewmodel
 
+import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.myapplication.data.ads.AdsManager
+import com.example.myapplication.data.local.preferences.AppSettings
 import com.example.myapplication.data.local.preferences.PreferencesRepository
+import com.example.myapplication.domain.model.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-@HiltViewModel
-class SettingsViewModel @Inject constructor(
-    private val preferencesRepository: PreferencesRepository
-) : ViewModel() {
-
-    private val _uiState = MutableStateFlow(SettingsUiState())
-    val uiState: kotlinx.coroutines.flow.StateFlow<SettingsUiState> = _uiState.asStateFlow()
-
-    private val _events = MutableStateFlow<SettingsEvent?>(null)
-    val events: kotlinx.coroutines.flow.StateFlow<SettingsEvent?> = _events.asStateFlow()
-
-    init {
-        loadSettings()
-    }
-
-    private fun loadSettings() {
-        viewModelScope.launch {
-            val themeMode = preferencesRepository.themeMode.first()
-            val notificationsEnabled = preferencesRepository.notificationsEnabled.first()
-            val adConsent = preferencesRepository.adPersonalizationConsent.first()
-            val gdprConsent = preferencesRepository.gdprConsent.first()
-            val adMobEnabled = preferencesRepository.adMobEnabled.first()
-            val unityAdsEnabled = preferencesRepository.unityAdsEnabled.first()
-            val ironSourceEnabled = preferencesRepository.ironSourceEnabled.first()
-
-            _uiState.update { it.copy(
-                themeMode = themeMode,
-                notificationsEnabled = notificationsEnabled,
-                adPersonalizationConsent = adConsent,
-                gdprConsent = gdprConsent,
-                adMobEnabled = adMobEnabled,
-                unityAdsEnabled = unityAdsEnabled,
-                ironSourceEnabled = ironSourceEnabled
-            ) }
-        }
-    }
-
-    fun setThemeMode(mode: Int) {
-        viewModelScope.launch {
-            preferencesRepository.setThemeMode(mode).subscribe()
-            _uiState.update { it.copy(themeMode = mode) }
-            _events.value = SettingsEvent.ThemeChanged(mode)
-        }
-    }
-
-    fun setNotificationsEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            preferencesRepository.setNotificationsEnabled(enabled).subscribe()
-            _uiState.update { it.copy(notificationsEnabled = enabled) }
-        }
-    }
-
-    fun setAdPersonalizationConsent(consent: Boolean) {
-        viewModelScope.launch {
-            preferencesRepository.setAdPersonalizationConsent(consent).subscribe()
-            _uiState.update { it.copy(adPersonalizationConsent = consent) }
-        }
-    }
-
-    fun setGdprConsent(consent: Boolean) {
-        viewModelScope.launch {
-            preferencesRepository.setGdprConsent(consent).subscribe()
-            _uiState.update { it.copy(gdprConsent = consent) }
-        }
-    }
-
-    fun setAdMobEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            preferencesRepository.setAdMobEnabled(enabled).subscribe()
-            _uiState.update { it.copy(adMobEnabled = enabled) }
-        }
-    }
-
-    fun setUnityAdsEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            preferencesRepository.setUnityAdsEnabled(enabled).subscribe()
-            _uiState.update { it.copy(unityAdsEnabled = enabled) }
-        }
-    }
-
-    fun setIronSourceEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            preferencesRepository.setIronSourceEnabled(enabled).subscribe()
-            _uiState.update { it.copy(ironSourceEnabled = enabled) }
-        }
-    }
-
-    fun clearData() {
-        viewModelScope.launch {
-            preferencesRepository.clearAll().subscribe()
-            _uiState.update { SettingsUiState() }
-            _events.value = SettingsEvent.DataCleared
-        }
-    }
-
-    fun consumeEvent(): SettingsEvent? {
-        return _events.value?.also { _events.value = null }
-    }
-}
-
 data class SettingsUiState(
-    val themeMode: Int = 0, // 0 = system, 1 = light, 2 = dark
-    val notificationsEnabled: Boolean = true,
-    val adPersonalizationConsent: Boolean = false,
-    val gdprConsent: Boolean = false,
-    val adMobEnabled: Boolean = true,
-    val unityAdsEnabled: Boolean = true,
-    val ironSourceEnabled: Boolean = true
+    val settings: AppSettings = AppSettings(),
+    val isPrivacyOptionsRequired: Boolean = false
 )
 
 sealed interface SettingsEvent {
-    data class ThemeChanged(val mode: Int) : SettingsEvent
-    data class DataCleared : SettingsEvent
+    data object DataCleared : SettingsEvent
+}
+
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    private val preferencesRepository: PreferencesRepository,
+    private val adsManager: AdsManager
+) : ViewModel() {
+
+    val uiState: StateFlow<SettingsUiState> = combine(
+        preferencesRepository.settings,
+        adsManager.state
+    ) { settings, ads ->
+        SettingsUiState(settings, ads.isPrivacyOptionsRequired)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
+
+    private val _events = Channel<SettingsEvent>(Channel.BUFFERED)
+    val events: Flow<SettingsEvent> = _events.receiveAsFlow()
+
+    fun setThemeMode(mode: ThemeMode) = save { setThemeMode(mode) }
+    fun setDynamicColor(enabled: Boolean) = save { setDynamicColor(enabled) }
+    fun setNotificationsEnabled(enabled: Boolean) = save { setNotificationsEnabled(enabled) }
+    fun setAdPersonalizationConsent(consent: Boolean) = save { setAdPersonalizationConsent(consent) }
+    fun setAdMobEnabled(enabled: Boolean) = save { setAdMobEnabled(enabled) }
+    fun setUnityAdsEnabled(enabled: Boolean) = save { setUnityAdsEnabled(enabled) }
+
+    fun openPrivacyOptions(activity: Activity) = adsManager.showPrivacyOptionsForm(activity)
+
+    fun clearData() {
+        viewModelScope.launch {
+            preferencesRepository.clearAll()
+            _events.send(SettingsEvent.DataCleared)
+        }
+    }
+
+    private fun save(block: suspend PreferencesRepository.() -> Unit) {
+        viewModelScope.launch { preferencesRepository.block() }
+    }
 }

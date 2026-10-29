@@ -1,42 +1,59 @@
 package com.example.myapplication.presentation.ui.screens
 
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.hilt.navigation.compose.HiltNavigationTestRule
-import com.example.myapplication.presentation.navigation.Screen
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.myapplication.presentation.ui.theme.AppTheme
+import com.example.myapplication.presentation.viewmodel.AuthUiState
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
 
+@RunWith(AndroidJUnit4::class)
 class LoginScreenTest {
 
     @get:Rule
     val composeRule = createComposeRule()
 
-    @get:Rule
-    val hiltRule = HiltNavigationTestRule(composeRule)
-
     @Test
-    fun loginScreen_displaysCorrectElements() {
-        // Test would require Hilt test setup with fake ViewModel
-        // This is a placeholder for actual UI tests
+    fun entersCredentialsAndSubmits() {
+        var submitted: Pair<String, String>? = null
+        composeRule.setContent {
+            AppTheme {
+                LoginScreen(
+                    uiState = AuthUiState(),
+                    onLoginClick = { e, p -> submitted = e to p },
+                    onRegisterClick = {},
+                    onForgotPasswordClick = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("email").performTextInput("user@example.com")
+        composeRule.onNodeWithTag("password").performTextInput("secret1")
+        composeRule.onNodeWithTag("login_button").performClick()
+
+        assertEquals("user@example.com" to "secret1", submitted)
     }
 
     @Test
-    fun loginScreen_emailField_acceptsInput() {
-    }
+    fun showsErrorMessage() {
+        composeRule.setContent {
+            AppTheme {
+                LoginScreen(
+                    uiState = AuthUiState(error = "Invalid credentials"),
+                    onLoginClick = { _, _ -> },
+                    onRegisterClick = {},
+                    onForgotPasswordClick = {}
+                )
+            }
+        }
 
-    @Test
-    fun loginScreen_passwordField_masksInput() {
-    }
-
-    @Test
-    fun loginScreen_loginButton_clickable() {
-    }
-
-    @Test
-    fun loginScreen_registerLink_navigatesToRegister() {
-    }
-
-    @Test
-    fun loginScreen_forgotPasswordLink_navigatesToForgotPassword() {
+        composeRule.onNodeWithText("Invalid credentials").assertIsDisplayed()
     }
 }

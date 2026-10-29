@@ -1,8 +1,6 @@
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.android")
-    id("com.google.dagger.hilt")
-    id("kotlin.plugin.serialization")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -11,25 +9,6 @@ android {
 
     defaultConfig {
         minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        consumerProguardFiles("consumer-rules.pro")
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-        debug {
-            isMinifyEnabled = false
-            isDebuggable = true
-        }
     }
 
     compileOptions {
@@ -39,43 +18,11 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf(
-            "-Xopt-in=kotlin.RequiresOptIn",
-            "-Xopt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-Xopt-in=androidx.lifecycle.ExperimentalLifecycleApi"
-        )
-    }
-
-    buildFeatures {
-        compose = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.12"
-    }
-
-    packagingOptions {
-        resources.excludes += listOf("META-INF/*")
     }
 }
 
 dependencies {
-    // Android & Core
-    implementation(libs.bundles.androidx.core)
-    implementation(libs.bundles.androidx.lifecycle)
-    implementation(libs.bundles.coroutines)
-    implementation(libs.bundles.serialization)
-
-    // Compose
-    implementation(platform(libs.compose.bom))
-    implementation(libs.bundles.compose)
-
-    // Hilt
-    implementation(libs.bundles.hilt)
-    ksp(libs.hilt.compiler)
-
-    // Testing
-    testImplementation(libs.bundles.testing.unit)
-    androidTestImplementation(libs.bundles.testing.instrumented)
-    kspAndroidTest(libs.hilt.compiler)
+    implementation(libs.kotlinx.coroutines.android)
+    testImplementation(libs.junit)
+    testImplementation(libs.truth)
 }

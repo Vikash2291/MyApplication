@@ -1,323 +1,189 @@
 package com.example.myapplication.presentation.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.myapplication.presentation.ui.components.AppCard
-import com.example.myapplication.presentation.ui.components.CustomTextField
-import com.example.myapplication.presentation.ui.components.PrimaryButton
-import com.example.myapplication.presentation.ui.components.TopAppBar
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.example.myapplication.presentation.ui.components.AppCard
+import com.example.myapplication.presentation.ui.components.AppTextField
+import com.example.myapplication.presentation.ui.components.AppTopBar
+import com.example.myapplication.presentation.ui.components.ErrorText
+import com.example.myapplication.presentation.ui.components.PrimaryButton
+import com.example.myapplication.presentation.ui.components.SecondaryButton
+import com.example.myapplication.presentation.ui.components.SectionHeader
+import com.example.myapplication.presentation.viewmodel.AuthUiState
+import java.text.DateFormat
+import java.util.Date
 
 @Composable
 fun ProfileScreen(
-    onUpdateProfile: (String, String?) -> Unit,
-    onLogoutClick: () -> Unit,
-    onBackClick: () -> Unit,
-    uiState: kotlinx.coroutines.flow.StateFlow<com.example.myapplication.presentation.viewmodel.AuthUiState>
+    uiState: AuthUiState,
+    snackbarHostState: SnackbarHostState,
+    onSaveProfile: (displayName: String, photoUrl: String) -> Unit,
+    onVerifyEmail: () -> Unit,
+    onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    onBackClick: () -> Unit
 ) {
-    val state by uiState.collectAsState()
-    val user = state.user
+    val user = uiState.user
+    var name by rememberSaveable { mutableStateOf(user?.displayName.orEmpty()) }
+    var photoUrl by rememberSaveable { mutableStateOf(user?.photoUrl.orEmpty()) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
-    var displayName by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(user?.displayName ?: "") }
-    var photoUrl by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(user?.photoUrl) }
+    LaunchedEffect(user?.id) {
+        name = user?.displayName.orEmpty()
+        photoUrl = user?.photoUrl.orEmpty()
+    }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = "Profile",
-                navigateUp = onBackClick
-            )
+    Scaffold(
+        topBar = { AppTopBar("Profile", onNavigateUp = onBackClick) },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Avatar(user?.photoUrl, user?.displayName ?: user?.email)
+            Text(user?.displayName ?: "No name set", style = MaterialTheme.typography.titleLarge)
+            Text(user?.email.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Profile Header
-                AppCard {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontals,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // Profile Image
-                        Box(
-                            modifier = Modifier.size(100.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            photoUrl?.let { url ->
-                                androidx.compose.foundation.Image(
-                                    painter = androidx.compose.foundation.rememberAsyncImagePainter(url),
-                                    contentDescription = "Profile",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(100.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                                )
-                            } ?: androidx.compose.foundation.Image(
-                                painter = painterResource(id = com.example.myapplication.R.drawable.ic_launcher),
-                                contentDescription = "Profile",
-                                contentScale = ContentScale.FitCenter,
-                                modifier = Modifier.size(100.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                            )
-                            
-                            // Camera Icon Overlay
-                            Box(
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .clip(androidx.compose.foundation.shape.CircleShape)
-                                    .align(Alignment.BottomEnd)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .offset(x = -4.dp, y = -4.dp)
-                                        .background(
-                                            color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                                            shape = androidx.compose.foundation.shape.CircleShape
-                                        )
-                                        .align(Alignment.BottomEnd)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CameraAlt,
-                                        contentDescription = "Change photo",
-                                        tint = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(20.dp).align(Alignment.Center)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Name & Email
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontals,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = displayName.ifBlank { "User" },
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-                            )
-                            user?.let { u ->
-                                Text(
-                                    text = u.email,
-                                    fontSize = 16.sp,
-                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        // Email Verified Badge
-                        user?.let { u ->
-                            if (u.isEmailVerified) {
-                                Row(
-                                    modifier = Modifier.padding(top = 8.dp),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Verified,
-                                        contentDescription = "Email verified",
-                                        tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    androidx.compose.foundation.layout.Spacer(Modifier.width(4.dp))
-                                    Text(
-                                        text = "Email verified",
-                                        fontSize = 12.sp,
-                                        color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            } else {
-                                Text(
-                                    text = "Email not verified",
-                                    fontSize = 12.sp,
-                                    color = androidx.compose.material3.MaterialTheme.colorScheme.error,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Edit Profile Section
-                AppCard {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Edit Profile",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        CustomTextField(
-                            value = displayName,
-                            onValueChange = { displayName = it },
-                            label = "Display Name",
-                            placeholder = "Enter your name",
-                            leadingIcon = Icons.Default.Person,
-                            isError = displayName.isNotBlank() && displayName.length < 2
-                        )
-
-                        androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
-
-                        PrimaryButton(
-                            text = "Save Changes",
-                            onClick = { onUpdateProfile(displayName, photoUrl) },
-                            icon = Icons.Default.Check
-                        )
-                    }
-                }
-
-                // Account Info Section
-                AppCard {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            text = "Account Info",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        InfoRow(
-                            icon = Icons.Default.Email,
-                            label = "Email",
-                            value = user?.email ?: "Not set"
-                        )
-
-                        androidx.compose.foundation.layout.Divider(
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant,
-                            modifier = Modifier.padding(start = 56.dp)
-                        )
-
-                        InfoRow(
-                            icon = Icons.Default.Person,
-                            label = "User ID",
-                            value = user?.id.take(8) ?: "Unknown"
-                        )
-
-                        androidx.compose.foundation.layout.Divider(
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant,
-                            modifier = Modifier.padding(start = 56.dp)
-                        )
-
-                        InfoRow(
-                            icon = Icons.Default.CalendarToday,
-                            label = "Member since",
-                            value = user?.createdAt?.let { formatTimestamp(it) } ?: "Unknown"
-                        )
-                    }
-                }
-
-                // Danger Zone
-                AppCard {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Danger Zone",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.error,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        PrimaryButton(
-                            text = "Sign Out",
-                            onClick = onLogoutClick,
-                            icon = Icons.Default.Logout,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+            if (user != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (user.isEmailVerified) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = if (user.isEmailVerified) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text(if (user.isEmailVerified) "Email verified" else "Email not verified")
+                    if (!user.isEmailVerified) {
+                        TextButton(onClick = onVerifyEmail) { Text("Send link") }
                     }
                 }
             }
+
+            SectionHeader("Edit profile", Modifier.fillMaxWidth())
+            AppCard {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AppTextField(name, { name = it }, "Display name")
+                    AppTextField(photoUrl, { photoUrl = it }, "Photo URL (optional)")
+                    ErrorText(uiState.error)
+                    PrimaryButton(
+                        text = "Save changes",
+                        onClick = { onSaveProfile(name, photoUrl) },
+                        loading = uiState.isLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            if (user != null) {
+                SectionHeader("Account", Modifier.fillMaxWidth())
+                AppCard {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        InfoRow("Member since", formatTimestamp(user.createdAt))
+                        InfoRow("Last sign-in", formatTimestamp(user.lastLoginAt))
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            SecondaryButton(
+                text = "Sign out",
+                onClick = onLogout,
+                icon = Icons.AutoMirrored.Filled.Logout,
+                modifier = Modifier.fillMaxWidth()
+            )
+            TextButton(onClick = { confirmDelete = true }) {
+                Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.size(6.dp))
+                Text("Delete account", color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete account?") },
+            text = { Text("This permanently deletes your account and data. You may need to sign in again first.") },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDeleteAccount() }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+        )
+    }
+}
+
+@Composable
+private fun Avatar(photoUrl: String?, fallbackName: String?) {
+    val modifier = Modifier
+        .size(96.dp)
+        .clip(CircleShape)
+        .background(MaterialTheme.colorScheme.primaryContainer)
+    if (!photoUrl.isNullOrBlank()) {
+        AsyncImage(model = photoUrl, contentDescription = "Profile photo", contentScale = ContentScale.Crop, modifier = modifier)
+    } else {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            Text(
+                fallbackName?.firstOrNull()?.uppercase() ?: "?",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
     }
 }
 
 @Composable
-fun InfoRow(
-    icon: ImageVector,
-    label: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.size(40.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            androidx.compose.foundation.layout.Spacer(Modifier.width(16.dp))
-            Text(
-                text = label,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-            )
-        )
-        Text(
-            text = value,
-            fontSize = 16.sp,
-            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = androidx.compose.ui.text.TextOverflow.Ellipsis,
-            modifier = Modifier.padding(end = 16.dp)
-        )
+private fun InfoRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value)
     }
 }
 
-fun formatTimestamp(timestamp: Long): String {
-    return java.text.SimpleDateFormat("MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
-}
+fun formatTimestamp(timestamp: Long): String =
+    if (timestamp <= 0L) "—" else DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(timestamp))

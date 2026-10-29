@@ -1,164 +1,100 @@
 package com.example.myapplication.domain.usecase
 
+import com.example.myapplication.domain.model.AuthResult
 import com.example.myapplication.domain.model.Result
 import com.example.myapplication.domain.model.User
 import com.example.myapplication.domain.repository.AuthRepository
-import com.example.myapplication.domain.model.AuthResult
-import io.mockk.every
+import com.google.common.truth.Truth.assertThat
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.verify
-import kotlinx.coroutines.runBlocking
-import org.junit.Assert.*
+import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 
 class AuthUseCasesTest {
 
-    private lateinit var authRepository: AuthRepository
-    private lateinit var loginUseCase: LoginUseCase
-    private lateinit var registerUseCase: RegisterUseCase
-    private lateinit var logoutUseCase: LogoutUseCase
-    private lateinit var getCurrentUserUseCase: GetCurrentUserUseCase
-    private lateinit var sendPasswordResetUseCase: SendPasswordResetUseCase
-    private lateinit var updateProfileUseCase: UpdateProfileUseCase
+    private val repository: AuthRepository = mockk()
+    private val user = User(id = "1", email = "user@example.com", displayName = "Alex")
+    private val authResult = AuthResult(user = user, accessToken = "token")
+
+    private lateinit var login: LoginUseCase
+    private lateinit var register: RegisterUseCase
+    private lateinit var reset: SendPasswordResetUseCase
+    private lateinit var updateProfile: UpdateProfileUseCase
 
     @Before
-    fun setup() {
-        authRepository = mockk()
-        loginUseCase = LoginUseCase(authRepository)
-        registerUseCase = RegisterUseCase(authRepository)
-        logoutUseCase = LogoutUseCase(authRepository)
-        getCurrentUserUseCase = GetCurrentUserUseCase(authRepository)
-        sendPasswordResetUseCase = SendPasswordResetUseCase(authRepository)
-        updateProfileUseCase = UpdateProfileUseCase(authRepository)
+    fun setUp() {
+        login = LoginUseCase(repository)
+        register = RegisterUseCase(repository)
+        reset = SendPasswordResetUseCase(repository)
+        updateProfile = UpdateProfileUseCase(repository)
     }
 
     @Test
-    fun login_success_returnsAuthResult() = runBlocking {
-        val expectedUser = User(
-            id = "123",
-            email = "test@example.com",
-            displayName = "Test User",
-            photoUrl = null,
-            isEmailVerified = true,
-            createdAt = System.currentTimeMillis(),
-            lastLoginAt = System.currentTimeMillis()
-        )
-        val expectedAuthResult = AuthResult(
-            user = expectedUser,
-            accessToken = "access_token",
-            refreshToken = "refresh_token",
-            expiresIn = 3600
-        )
+    fun `login with valid input delegates to repository`() = runTest {
+        coEvery { repository.login("user@example.com", "secret1") } returns Result.Success(authResult)
 
-        every { authRepository.login("test@example.com", "password123") } returns Result.Success(expectedAuthResult)
+        val result = login(" user@example.com ", "secret1")
 
-        val result = loginUseCase("test@example.com", "password123")
-
-        assertTrue(result is Result.Success)
-        val success = result as Result.Success<AuthResult>
-        assertEquals(expectedAuthResult, success.data)
-        verify { authRepository.login("test@example.com", "password123") }
+        assertThat(result).isEqualTo(Result.Success(authResult))
+        coVerify(exactly = 1) { repository.login("user@example.com", "secret1") }
     }
 
     @Test
-    fun login_failure_returnsError() = runBlocking {
-        every { authRepository.login("wrong@example.com", "wrongpass") } returns Result.Error(Exception("Invalid credentials"), "Invalid credentials")
+    fun `login with invalid email fails without calling repository`() = runTest {
+        val result = login("not-an-email", "secret1")
 
-        val result = loginUseCase("wrong@example.com", "wrongpass")
-
-        assertTrue(result is Result.Error)
-        val error = result as Result.Error
-        assertEquals("Invalid credentials", error.message)
+        assertThat(result).isInstanceOf(Result.Error::class.java)
+        coVerify(exactly = 0) { repository.login(any(), any()) }
     }
 
     @Test
-    fun register_success_returnsAuthResult() = runBlocking {
-        val expectedUser = User(
-            id = "456",
-            email = "new@example.com",
-            displayName = "New User",
-            photoUrl = null,
-            isEmailVerified = false,
-            createdAt = System.currentTimeMillis(),
-            lastLoginAt = System.currentTimeMillis()
-        )
-        val expectedAuthResult = AuthResult(
-            user = expectedUser,
-            accessToken = "new_access_token",
-            refreshToken = "new_refresh_token",
-            expiresIn = 3600
-        )
+    fun `login with blank password fails`() = runTest {
+        val result = login("user@example.com", "")
 
-        every { authRepository.register("new@example.com", "password123", "New User") } returns Result.Success(expectedAuthResult)
-
-        val result = registerUseCase("new@example.com", "password123", "New User")
-
-        assertTrue(result is Result.Success)
-        val success = result as Result.Success<AuthResult>
-        assertEquals(expectedAuthResult, success.data)
+        assertThat((result as Result.Error).message).isEqualTo("Password is required")
     }
 
     @Test
-    fun logout_success_returnsUnit() = runBlocking {
-        every { authRepository.logout() } returns Result.Success(Unit)
+    fun `register rejects short password`() = runTest {
+        val result = register("user@example.com", "123", "Alex", "123")
 
-        val result = logoutUseCase()
-
-        assertTrue(result is Result.Success)
-        verify { authRepository.logout() }
+        assertThat(result).isInstanceOf(Result.Error::class.java)
+        coVerify(exactly = 0) { repository.register(any(), any(), any()) }
     }
 
     @Test
-    fun getCurrentUser_returnsUser() = runBlocking {
-        val expectedUser = User(
-            id = "123",
-            email = "test@example.com",
-            displayName = "Test User",
-            photoUrl = null,
-            isEmailVerified = true,
-            createdAt = System.currentTimeMillis(),
-            lastLoginAt = System.currentTimeMillis()
-        )
+    fun `register rejects mismatched confirmation`() = runTest {
+        val result = register("user@example.com", "secret1", "Alex", "secret2")
 
-        every { authRepository.getCurrentUser() } returns Result.Success(expectedUser)
-
-        val result = getCurrentUserUseCase()
-
-        assertTrue(result is Result.Success)
-        val success = result as Result.Success<User?>
-        assertEquals(expectedUser, success.data)
+        assertThat((result as Result.Error).message).isEqualTo("Passwords do not match")
     }
 
     @Test
-    fun sendPasswordReset_success_returnsUnit() = runBlocking {
-        every { authRepository.sendPasswordResetEmail("test@example.com") } returns Result.Success(Unit)
+    fun `register with valid input trims name and email`() = runTest {
+        coEvery { repository.register("user@example.com", "secret1", "Alex") } returns Result.Success(authResult)
 
-        val result = sendPasswordResetUseCase("test@example.com")
+        val result = register(" user@example.com", "secret1", " Alex ", "secret1")
 
-        assertTrue(result is Result.Success)
-        verify { authRepository.sendPasswordResetEmail("test@example.com") }
+        assertThat(result).isEqualTo(Result.Success(authResult))
     }
 
     @Test
-    fun updateProfile_success_returnsUpdatedUser() = runBlocking {
-        val expectedUser = User(
-            id = "123",
-            email = "test@example.com",
-            displayName = "Updated Name",
-            photoUrl = "https://example.com/photo.jpg",
-            isEmailVerified = true,
-            createdAt = System.currentTimeMillis(),
-            lastLoginAt = System.currentTimeMillis()
-        )
+    fun `password reset validates email`() = runTest {
+        val result = reset("bad")
 
-        every { authRepository.updateProfile("Updated Name", "https://example.com/photo.jpg") } returns Result.Success(expectedUser)
+        assertThat(result).isInstanceOf(Result.Error::class.java)
+        coVerify(exactly = 0) { repository.sendPasswordResetEmail(any()) }
+    }
 
-        val result = updateProfileUseCase("Updated Name", "https://example.com/photo.jpg")
+    @Test
+    fun `update profile converts blank photo url to null`() = runTest {
+        coEvery { repository.updateProfile("Alex", null) } returns Result.Success(user)
 
-        assertTrue(result is Result.Success)
-        val success = result as Result.Success<User>
-        assertEquals("Updated Name", success.data.displayName)
-        assertEquals("https://example.com/photo.jpg", success.data.photoUrl)
+        val result = updateProfile("Alex", "  ")
+
+        assertThat(result).isEqualTo(Result.Success(user))
+        coVerify { repository.updateProfile("Alex", null) }
     }
 }

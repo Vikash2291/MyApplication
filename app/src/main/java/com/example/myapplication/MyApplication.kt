@@ -1,70 +1,101 @@
 package com.example.myapplication
 
 import android.app.Application
-import android.content.Context
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
+import android.util.Log
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
-import com.example.myapplication.data.ads.AdsManagerImpl
+import androidx.work.Configuration
+import com.example.myapplication.core.common.Constants
+import com.example.myapplication.utils.SyncWorker
 import com.google.firebase.FirebaseApp
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
+import javax.inject.Inject
 
 @HiltAndroidApp
-class MyApplication : Application() {
+class MyApplication : Application(), Configuration.Provider {
+
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .setMinimumLoggingLevel(if (BuildConfig.DEBUG) Log.DEBUG else Log.ERROR)
+            .build()
+
+    val isFirebaseAvailable: Boolean
+        get() = FirebaseApp.getApps(this).isNotEmpty()
 
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize Firebase
-        FirebaseApp.initializeApp(this)
+        if (BuildConfig.FIREBASE_CONFIGURED) {
+            FirebaseApp.initializeApp(this)
+        }
 
-        // Initialize Crashlytics
-        FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(true)
-
-        // Initialize Analytics
-        FirebaseAnalytics.getInstance(this)
-
-        // Setup Timber for logging
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
-        } else {
+        } else if (isFirebaseAvailable) {
             Timber.plant(CrashlyticsTree())
         }
 
-        // Initialize Ads (AdMob & Unity)
-        AdsManagerImpl.initialize(this)
+        if (isFirebaseAvailable) {
+            FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(!BuildConfig.DEBUG)
+            ProcessLifecycleOwner.get().lifecycle.addObserver(
+                AppLifecycleObserver(FirebaseAnalytics.getInstance(this))
+            )
+        } else {
+            Timber.w("Firebase not configured: add app/google-services.json to enable auth & analytics")
+        }
 
-        // Register lifecycle observer for analytics
-        ProcessLifecycleOwner.get().lifecycle.addObserver(AppLifecycleObserver())
+        createNotificationChannels()
+        SyncWorker.schedule(this)
     }
 
-    companion object {
-        @Suppress("UNUSED_PARAMETER")
-        fun getInstance(context: Context): MyApplication {
-            return context.applicationContext as MyApplication
-        }
+    private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannels(
+            listOf(
+                NotificationChannel(
+                    Constants.NOTIFICATION_CHANNEL_GENERAL,
+                    getString(R.string.notification_channel_general),
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ),
+                NotificationChannel(
+                    Constants.NOTIFICATION_CHANNEL_SYNC,
+                    getString(R.string.notification_channel_sync),
+                    NotificationManager.IMPORTANCE_LOW
+                )
+            )
+        )
     }
 }
 
 private class CrashlyticsTree : Timber.Tree() {
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-        if (priority >= android.util.Log.ERROR) {
-            FirebaseCrashlytics.getInstance().recordException(
-                t ?: Exception(message)
-            )
-        }
+        if (priority < Log.WARN) return
+        val crashlytics = FirebaseCrashlytics.getInstance()
+        crashlytics.log(message)
+        if (priority >= Log.ERROR) crashlytics.recordException(t ?: Exception(message))
     }
 }
 
-class AppLifecycleObserver : DefaultLifecycleObserver {
+private class AppLifecycleObserver(
+    private val analytics: FirebaseAnalytics
+) : DefaultLifecycleObserver {
     override fun onStart(owner: LifecycleOwner) {
-        // App came to foreground
-        FirebaseAnalytics.getInstance(owner as Application).logEvent("app_foreground", null)
+        analytics.logEvent("app_foreground", null)
     }
 
     override fun onStop(owner: LifecycleOwner) {
-        // App went to background
-        FirebaseAnalytics.getInstance(owner as Application).logEvent("app_background", null)
+        analytics.logEvent("app_background", null)
     }
 }
