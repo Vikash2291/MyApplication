@@ -83,9 +83,14 @@ jobs:
       - name: Prepare secrets
         env:
           RELEASE_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -n "$RELEASE_KEYSTORE" ]; then echo "$RELEASE_KEYSTORE" | base64 -d > release.keystore; fi
+          if [ -n "$RELEASE_KEYSTORE" ]; then echo "$RELEASE_KEYSTORE" | base64 -d > release.keystore;
+          elif [ -n "$KEYSTORE_PASSWORD" ] && [ -f signing/release.keystore.gpg ]; then
+            # Keystore is committed only in AES-256 encrypted form; decrypted with the KEYSTORE_PASSWORD secret.
+            gpg --batch --quiet --pinentry-mode loopback --passphrase "$KEYSTORE_PASSWORD" -d signing/release.keystore.gpg > release.keystore
+          fi
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json; fi
 
       - name: Build release APK & AAB
