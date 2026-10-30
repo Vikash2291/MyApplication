@@ -24,6 +24,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
+import android.app.Activity
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.example.myapplication.R
+import com.google.android.gms.ads.AdListener
+import com.google.android.gms.ads.LoadAdError
+import com.unity3d.ads.UnityAds
+import com.unity3d.services.banners.BannerView
+import com.unity3d.services.banners.UnityBannerSize
 import android.os.Bundle
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,8 +53,15 @@ fun AdaptiveBannerSlot(adUnitId: String, modifier: Modifier = Modifier, collapsi
     val context = LocalContext.current
     val widthDp = LocalConfiguration.current.screenWidthDp
     val adSize = remember(widthDp) { AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, widthDp) }
+    // When AdMob has no banner (no fill / account limited) switch to a Unity banner.
+    var useUnity by remember { mutableStateOf(false) }
     val adView = remember(adUnitId, adSize) {
         AdView(context).apply {
+            adListener = object : AdListener() {
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    if (UnityAds.isInitialized && context is Activity) useUnity = true
+                }
+            }
             setAdSize(adSize)
             this.adUnitId = adUnitId
             val request = AdRequest.Builder().apply {
@@ -88,7 +104,11 @@ fun AdaptiveBannerSlot(adUnitId: String, modifier: Modifier = Modifier, collapsi
                     .height(adSize.height.dp),
                 contentAlignment = Alignment.Center
             ) {
-                AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())
+                if (useUnity && context is Activity) {
+                    UnityBanner(context)
+                } else {
+                    AndroidView(factory = { adView }, modifier = Modifier.fillMaxWidth())
+                }
             }
         }
     }
@@ -101,4 +121,14 @@ fun AppBannerBar(modifier: Modifier = Modifier, viewModel: BannerViewModel = hil
     if (show && viewModel.adUnitId.isNotBlank()) {
         AdaptiveBannerSlot(viewModel.adUnitId, modifier)
     }
+}
+
+@Composable
+private fun UnityBanner(activity: Activity) {
+    val placement = activity.getString(R.string.unity_banner_placement)
+    val banner = remember(placement) {
+        BannerView(activity, placement, UnityBannerSize(320, 50)).apply { load() }
+    }
+    DisposableEffect(banner) { onDispose { banner.destroy() } }
+    AndroidView(factory = { banner })
 }

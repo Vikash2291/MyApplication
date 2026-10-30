@@ -177,4 +177,10 @@
         <item quantity="one">%d-day streak</item>
         <item quantity="other">%d-day streak</item>
     </plurals>
+    <!-- Unity Ads direct fallback (debug: test mode on) -->
+    <string name="unity_game_id" translatable="false">800416486</string>
+    <string name="unity_interstitial_placement" translatable="false">BP_Interstitial_Android</string>
+    <string name="unity_rewarded_placement" translatable="false">BP_Rewarded_Android</string>
+    <string name="unity_banner_placement" translatable="false">Banner_Android</string>
+    <bool name="unity_test_mode">true</bool>
 </resources>

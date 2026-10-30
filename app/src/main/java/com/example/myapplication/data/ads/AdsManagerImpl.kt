@@ -50,6 +50,7 @@ class AdsManagerImpl @Inject constructor(
         UserMessagingPlatform.getConsentInformation(context)
     private val sdkInitStarted = AtomicBoolean(false)
     private val interstitialPacer = InterstitialPacer(clock = SystemClock::elapsedRealtime)
+    private val unity = UnityFallback(context)
 
     private val _state = MutableStateFlow(AdsState())
     override val state: StateFlow<AdsState> = _state.asStateFlow()
@@ -174,6 +175,12 @@ class AdsManagerImpl @Inject constructor(
         if (!_state.value.isInitialized || !adsAllowed) return
         loadRewarded()
         loadInterstitial()
+        // Unity direct backup, used only when AdMob has nothing ready.
+        unity.initialize {
+            unity.load(unity.interstitialPlacement)
+            unity.load(unity.rewardedPlacement)
+            scope.launch { refreshReadiness() }
+        }
     }
 
     private fun adRequest(): AdRequest = AdRequest.Builder().build()
@@ -219,8 +226,8 @@ class AdsManagerImpl @Inject constructor(
     private fun refreshReadiness() {
         _state.update {
             it.copy(
-                isRewardedReady = adsAllowed && rewardedAd != null,
-                isInterstitialReady = adsAllowed && interstitialAd != null
+                isRewardedReady = adsAllowed && (rewardedAd != null || unity.isReady(unity.rewardedPlacement)),
+                isInterstitialReady = adsAllowed && (interstitialAd != null || unity.isReady(unity.interstitialPlacement))
             )
         }
     }
@@ -236,6 +243,17 @@ class AdsManagerImpl @Inject constructor(
             return
         }
         val ad = rewardedAd.takeIf { adsAllowed }
+        if (ad == null && adsAllowed && unity.isReady(unity.rewardedPlacement)) {
+            fullScreenTracker.setShowing(true)
+            refreshReadiness()
+            unity.show(activity, unity.rewardedPlacement) { completed ->
+                scope.launch {
+                    finishFullScreen()
+                    onResult(if (completed) RewardOutcome.Earned(DEFAULT_REWARD) else RewardOutcome.Skipped)
+                }
+            }
+            return
+        }
         if (ad == null) {
             preloadAds()
             onResult(RewardOutcome.Unavailable("No video available right now. Please try again shortly."))
@@ -262,6 +280,17 @@ class AdsManagerImpl @Inject constructor(
     override fun onNaturalBreak(activity: Activity, onContinue: () -> Unit) {
         interstitialPacer.recordUserAction()
         val ad = interstitialAd.takeIf { adsAllowed }
+        if (ad == null && adsAllowed && !fullScreenTracker.isShowing && interstitialPacer.canShow() &&
+            unity.isReady(unity.interstitialPlacement)
+        ) {
+            fullScreenTracker.setShowing(true)
+            interstitialPacer.onShown()
+            refreshReadiness()
+            unity.show(activity, unity.interstitialPlacement) {
+                scope.launch { finishFullScreen(); onContinue() }
+            }
+            return
+        }
         if (ad == null || fullScreenTracker.isShowing || !interstitialPacer.canShow()) {
             if (ad == null) preloadAds()
             onContinue()
