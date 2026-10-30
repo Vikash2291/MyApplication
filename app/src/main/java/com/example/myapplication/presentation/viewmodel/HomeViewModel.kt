@@ -41,6 +41,7 @@ data class HomeUiState(
 sealed interface HomeEvent {
     data class RewardGranted(val amount: Int) : HomeEvent
     data class Message(@StringRes val res: Int) : HomeEvent
+    data object MegaUnlocked : HomeEvent
 }
 
 @HiltViewModel
@@ -92,6 +93,20 @@ class HomeViewModel @Inject constructor(
                         preferencesRepository.addRewardPoints(outcome.amount)
                         _events.send(HomeEvent.RewardGranted(outcome.amount))
                     }
+                    RewardOutcome.Skipped -> _events.send(HomeEvent.Message(R.string.reward_skipped))
+                    is RewardOutcome.Unavailable -> _events.send(HomeEvent.Message(R.string.ad_unavailable))
+                }
+            }
+        }
+    }
+
+    /** Optional: user taps "Unlock Mega Quiz", watches a rewarded video, then the quiz opens. */
+    fun unlockMegaQuiz(activity: Activity) {
+        if (adsManager.isFullScreenAdShowing) return
+        adsManager.showRewardedAd(activity) { outcome ->
+            viewModelScope.launch {
+                when (outcome) {
+                    is RewardOutcome.Earned -> _events.send(HomeEvent.MegaUnlocked)
                     RewardOutcome.Skipped -> _events.send(HomeEvent.Message(R.string.reward_skipped))
                     is RewardOutcome.Unavailable -> _events.send(HomeEvent.Message(R.string.ad_unavailable))
                 }

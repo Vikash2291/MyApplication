@@ -83,6 +83,7 @@ fun QuizScreen(
 
     val title = when (uiState.mode) {
         QuizMode.DAILY -> stringResource(R.string.daily_quiz_title)
+        QuizMode.MEGA -> stringResource(R.string.mega_quiz_title)
         QuizMode.BOOKMARKS -> stringResource(R.string.bookmarks_practice_title)
         QuizMode.CATEGORY -> uiState.category?.let { stringResource(it.labelRes()) } ?: stringResource(R.string.quiz_title)
     }

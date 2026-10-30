@@ -162,4 +162,8 @@
         <item quantity="one">%d दिन की स्ट्रीक</item>
         <item quantity="other">%d दिन की स्ट्रीक</item>
     </plurals>
+    <string name="mega_quiz_title">मेगा क्विज़</string>
+    <string name="mega_quiz_subtitle">सभी श्रेणियों के 20 मिले-जुले प्रश्न। अनलॉक करने के लिए एक छोटा वीडियो देखें।</string>
+    <string name="mega_quiz_unlock">वीडियो देखें और अनलॉक करें</string>
+    <string name="native_ad_badge">विज्ञापन</string>
 </resources>

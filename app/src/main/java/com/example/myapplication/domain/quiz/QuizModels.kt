@@ -18,7 +18,10 @@ enum class AppLanguage(val tag: String) {
     }
 }
 
-enum class QuizMode { CATEGORY, DAILY, BOOKMARKS }
+enum class QuizMode { CATEGORY, DAILY, BOOKMARKS, MEGA }
+
+/** Mega quiz: 20 mixed questions, unlocked by an optional rewarded video. */
+const val MEGA_QUIZ_SIZE = 20
 
 /** One language version of a question. */
 data class LocalizedQuestion(

@@ -1,5 +1,6 @@
 package com.example.myapplication.data.quiz
 
+import com.example.myapplication.domain.quiz.MEGA_QUIZ_SIZE
 import com.example.myapplication.data.local.database.dao.QuizDao
 import com.example.myapplication.data.local.database.entity.AttemptAnswerEntity
 import com.example.myapplication.data.local.database.entity.BookmarkEntity
@@ -74,6 +75,11 @@ class QuizRepositoryImpl @Inject constructor(
                 ids.mapNotNull { byId[it] }
             }
             QuizMode.BOOKMARKS -> dao.randomBookmarkedQuestions(count)
+            QuizMode.MEGA -> {
+                val ids = dao.allQuestionIds().shuffled().take(MEGA_QUIZ_SIZE)
+                val byId = dao.questionsByIds(ids).associateBy { it.id }
+                ids.mapNotNull { byId[it] }
+            }
         }
         return entities.mapNotNull { it.toDomain() }
     }

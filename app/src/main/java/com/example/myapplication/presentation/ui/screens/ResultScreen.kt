@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.screens
 
+import com.example.myapplication.presentation.ui.components.NativeAdCard
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -130,6 +131,8 @@ fun ResultScreen(
                         bookmarked = item.question.id in uiState.bookmarkIds,
                         onToggleBookmark = { onToggleBookmark(item.question.id) }
                     )
+                    // One native ad card after the 3rd review item, never between score and buttons.
+                    if (index == 2) NativeAdCard(Modifier.padding(top = 12.dp))
                 }
             }
         }

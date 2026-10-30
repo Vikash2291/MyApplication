@@ -183,4 +183,9 @@
     <string name="unity_rewarded_placement" translatable="false">BP_Rewarded_Android</string>
     <string name="unity_banner_placement" translatable="false">Banner_Android</string>
     <bool name="unity_test_mode">true</bool>
+    <string name="mega_quiz_title">Mega Quiz</string>
+    <string name="mega_quiz_subtitle">20 mixed questions from all categories. Watch a short video to unlock.</string>
+    <string name="mega_quiz_unlock">Watch video &amp; unlock</string>
+    <string name="native_ad_badge">Ad</string>
+    <string name="admob_native_ad_unit_id" translatable="false">ca-app-pub-3940256099942544/2247696110</string>
 </resources>

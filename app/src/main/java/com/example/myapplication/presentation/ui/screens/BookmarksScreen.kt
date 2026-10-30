@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.screens
 
+import com.example.myapplication.presentation.ui.components.NativeAdCard
 import com.example.myapplication.presentation.ui.components.AppBannerBar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
@@ -69,7 +70,8 @@ fun BookmarksScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                items(uiState.questions, key = { it.id }) { question ->
+                itemsIndexed(uiState.questions, key = { _, q -> q.id }) { index, question ->
+                    if (index == 3) NativeAdCard(Modifier.padding(bottom = 12.dp))
                     val q = question.localized(uiState.language)
                     AppCard {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

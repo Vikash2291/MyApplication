@@ -138,6 +138,7 @@ fun AppNavHost(
                         is HomeEvent.RewardGranted ->
                             snackbarHostState.showSnackbar(context.getString(R.string.reward_granted, event.amount))
                         is HomeEvent.Message -> snackbarHostState.showSnackbar(context.getString(event.res))
+                        HomeEvent.MegaUnlocked -> startQuiz(QuizMode.MEGA)
                     }
                 }
             }
@@ -150,6 +151,7 @@ fun AppNavHost(
                 onStartDaily = { startQuiz(QuizMode.DAILY) },
                 onStartCategory = { startQuiz(QuizMode.CATEGORY, it) },
                 onWatchRewardedAd = { activity?.let(homeViewModel::showRewardedAd) },
+                onUnlockMega = { activity?.let(homeViewModel::unlockMegaQuiz) },
                 onBookmarksClick = { navController.navigate(Screen.Bookmarks.route) },
                 onStatsClick = { navController.navigate(Screen.Stats.route) },
                 onProfileClick = { navController.navigate(Screen.Profile.route) },
@@ -233,7 +235,7 @@ fun AppNavHost(
                 onPlayAgain = {
                     val review = resultState.review
                     val mode = review?.mode ?: QuizMode.CATEGORY
-                    if (mode == QuizMode.CATEGORY && review?.category == null) {
+                    if ((mode == QuizMode.CATEGORY && review?.category == null) || mode == QuizMode.MEGA) {
                         backToHome()
                     } else {
                         navController.navigate(Screen.Quiz.create(mode, review?.category)) {

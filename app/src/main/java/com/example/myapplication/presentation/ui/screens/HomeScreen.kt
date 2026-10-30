@@ -64,6 +64,7 @@ fun HomeScreen(
     onStartDaily: () -> Unit,
     onStartCategory: (QuizCategory) -> Unit,
     onWatchRewardedAd: () -> Unit,
+    onUnlockMega: () -> Unit,
     onBookmarksClick: () -> Unit,
     onStatsClick: () -> Unit,
     onProfileClick: () -> Unit,
@@ -107,6 +108,7 @@ fun HomeScreen(
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) { GreetingCard(uiState) }
             item(span = { GridItemSpan(maxLineSpan) }) { DailyQuizCard(uiState.dailyCompletedToday, onStartDaily) }
+            item(span = { GridItemSpan(maxLineSpan) }) { MegaQuizCard(onUnlockMega) }
             item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(R.string.home_categories)) }
             items(QuizCategory.entries, key = { it.name }) { category ->
                 CategoryCard(category, uiState.questionCounts[category] ?: 0) { onStartCategory(category) }
@@ -236,6 +238,36 @@ private fun BonusCard(isReady: Boolean, onWatch: () -> Unit) {
                 onClick = onWatch,
                 enabled = isReady,
                 modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun MegaQuizCard(onUnlock: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Text(
+                stringResource(R.string.mega_quiz_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Text(
+                stringResource(R.string.mega_quiz_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Spacer(Modifier.height(16.dp))
+            PrimaryButton(
+                text = stringResource(R.string.mega_quiz_unlock),
+                onClick = onUnlock,
+                icon = Icons.Default.PlayCircle,
+                modifier = Modifier.fillMaxWidth().testTag("mega_quiz_unlock")
             )
         }
     }
