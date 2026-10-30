@@ -6,48 +6,38 @@ import kotlinx.serialization.Serializable
 data class User(
     val id: String,
     val email: String,
-    val displayName: String?,
-    val photoUrl: String?,
-    val isEmailVerified: Boolean,
-    val createdAt: Long,
-    val lastLoginAt: Long
-) {
-    companion object {
-        fun empty(): User = User(
-            id = "",
-            email = "",
-            displayName = null,
-            photoUrl = null,
-            isEmailVerified = false,
-            createdAt = 0,
-            lastLoginAt = 0
-        )
-    }
-}
+    val displayName: String? = null,
+    val photoUrl: String? = null,
+    val isEmailVerified: Boolean = false,
+    val createdAt: Long = 0L,
+    val lastLoginAt: Long = 0L
+)
 
-@Serializable
 data class AuthResult(
     val user: User,
     val accessToken: String,
-    val refreshToken: String?,
-    val expiresIn: Long
+    val refreshToken: String? = null,
+    val expiresIn: Long = 0L
 )
 
-@Serializable
-sealed class Result<out T> {
-    @Serializable
-    data class Success<out T>(val data: T) : Result<T>()
-    
-    @Serializable
-    data class Error(val exception: Throwable, val message: String) : Result<Nothing>()
-    
-    @Serializable
-    object Loading : Result<Nothing>()
+/**
+ * Thrown when a sensitive operation (e.g. account deletion) needs the user to confirm their
+ * password again because the last sign-in is too old.
+ */
+class ReauthenticationRequiredException(
+    message: String = "For your security, please enter your password again to continue."
+) : Exception(message)
+
+/** UI theme selection persisted in preferences. */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
+/** Wrapper for the outcome of a repository / use-case call. */
+sealed interface Result<out T> {
+    data class Success<out T>(val data: T) : Result<T>
+    data class Error(val message: String, val exception: Throwable? = null) : Result<Nothing>
 }
 
-@Serializable
-data class ApiError(
-    val code: Int,
-    val message: String,
-    val details: String?
-)
+inline fun <T, R> Result<T>.map(transform: (T) -> R): Result<R> = when (this) {
+    is Result.Success -> Result.Success(transform(data))
+    is Result.Error -> this
+}

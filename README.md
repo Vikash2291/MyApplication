@@ -1,6 +1,44 @@
-# MyApplication
+# GK Quiz – Hindi & English
 
-Production-ready Android application built with modern architecture and best practices.
+A bilingual (English / हिन्दी) general-knowledge quiz app built on a production-ready Android
+architecture (Kotlin, Compose, Hilt, Room, DataStore, Firebase Auth, AdMob + UMP).
+Application id: `com.alfred.myapplication`.
+
+## 🧠 Quiz features
+
+- **Offline question bank**: 300+ fact-checked multiple-choice questions (4 options, one correct
+  answer, short explanation) in English and Hindi, bundled in `app/src/main/assets/questions.json`
+  and imported into Room on first launch. Categories: India GK, World GK, Science, History,
+  Geography, Sports, Current Affairs (settled, dated facts only) and Computers.
+- **Quiz**: 10 questions, 20 seconds each, instant right/wrong feedback with explanation,
+  bookmark any question. Least-seen questions are served first.
+- **Daily Quiz**: the same 10 questions for everyone on a given date
+  (`DailyQuizSelector`, deterministic), with a daily streak stored in DataStore.
+- **Result**: score, points earned, full answer review with explanations.
+- **Bookmarks**, **Progress/Stats** (accuracy, coverage and best score per category, streaks).
+- **Language toggle** in Settings (DataStore): UI strings come from `values/` and `values-hi/`,
+  question text from the per-question translations.
+- **Points**: 10 per correct answer, +20 for a perfect quiz, +10 for completing the daily quiz.
+- Sign in with email (Firebase) or continue as a guest; in-app account deletion wipes quiz data too.
+
+### Ads policy in the quiz
+
+- Rewarded (opt-in only): "50:50 hint" or "+10 s time" during a question; the timer pauses while
+  the video plays.
+- Interstitial: only at the break between quizzes (Result → Home), using the existing pacing
+  (≥ 2 user actions and ≥ 2 minutes between interstitials).
+- Banner: Home and Result only, in a fixed bottom slot. Never on the Quiz screen near answers.
+
+### Editing the question bank
+
+Questions live in `tools/questions/bank_*.py` (correct option first). Regenerate the asset with:
+
+```bash
+python3 tools/questions/build_bank.py   # validates, shuffles options deterministically, writes JSON
+```
+
+Append new questions at the end of a list (ids stay stable) and bump `BANK_VERSION` so
+installed apps re-import the bank. `QuestionBankTest` guards the asset in CI.
 
 ## 🏗 Architecture
 
@@ -28,7 +66,7 @@ Data Layer
 ├── local/           # Room database, DataStore preferences
 ├── remote/          # Retrofit API service, DTOs
 ├── repository/      # Repository implementations
-└── ads/             # AdMob + Unity LevelPlay mediation
+└── ads/             # AdMob Mediation (Unity bidding), UMP, app open
 
 Presentation Layer
 ├── navigation/      # Navigation graph & navigator
@@ -43,8 +81,8 @@ Presentation Layer
 
 | Category | Technology |
 |----------|------------|
-| **Language** | Kotlin 1.9.23 |
-| **Build** | Gradle 8.5 (KTS) + Version Catalogs |
+| **Language** | Kotlin 2.2 |
+| **Build** | Gradle 8.14 + AGP 8.13 (KTS) + Version Catalogs |
 | **Architecture** | Clean Architecture + MVVM |
 | **DI** | Hilt 2.48 |
 | **Async** | Coroutines + Flow |
@@ -54,8 +92,8 @@ Presentation Layer
 | **UI** | Jetpack Compose + Material3 + Navigation Compose |
 | **Auth** | Firebase Auth |
 | **Analytics/Crashlytics** | Firebase Analytics + Crashlytics |
-| **Ads** | AdMob + Unity LevelPlay (Bidding Mediation) |
-| **Testing** | JUnit 5, MockK, Turbine, Robolectric, Compose Testing |
+| **Ads** | AdMob Mediation (Unity Ads as bidding source) + UMP |
+| **Testing** | JUnit 4, MockK, Truth, Coroutines Test, Compose UI Test |
 | **Static Analysis** | Detekt |
 | **CI/CD** | GitHub Actions |
 
@@ -63,13 +101,14 @@ Presentation Layer
 
 - ✅ **Authentication** - Email/password with Firebase Auth + backend sync
 - ✅ **User Profile** - Display name, photo, email verification
+- ✅ **Account deletion** - In-app (Profile, or Settings → Data), with password re-auth when Firebase requires a recent login; wipes Room + DataStore
 - ✅ **Offline-first** - Room database with reactive Flow streams
 - ✅ **Preferences** - DataStore (type-safe, async)
-- ✅ **Ads Monetization** - AdMob + Unity LevelPlay bidding (rewarded, interstitial, banner)
+- ✅ **Ads Monetization** - AdMob Mediation with Unity bidding (rewarded, interstitial, app open, banner)
 - ✅ **Consent Management** - UMP (User Messaging Platform) for GDPR/CCPA
 - ✅ **Analytics** - Firebase Analytics + Crashlytics
 - ✅ **Push Notifications** - FCM ready
-- ✅ **Background Sync** - WorkManager + Foreground Service
+- ✅ **Background Sync** - WorkManager (Hilt worker, every 6h)
 - ✅ **Theming** - Light/Dark/System + Material3 dynamic colors
 - ✅ **CI/CD** - Automated lint, test, build, release
 
@@ -77,63 +116,44 @@ Presentation Layer
 
 ### Prerequisites
 
-- Android Studio Koala (2024.1.1)+ or IntelliJ IDEA
+- Android Studio Koala (2024.1.1)+
 - JDK 17
-- Android SDK 34 (compileSdk) / minSdk 24
+- Android SDK 36 (compileSdk/targetSdk 36, minSdk 24)
 
 ### Setup
 
 ```bash
-# Clone repository
-git clone <repository-url>
+git clone https://github.com/Vikash2291/MyApplication.git
 cd MyApplication
-
-# Create local.properties with SDK path
-echo "sdk.dir=/path/to/your/android/sdk" > local.properties
-
-# Add your API keys to strings.xml (or use build config)
-# Edit app/src/main/res/values/strings.xml:
-# - YOUR_ADMOB_APP_ID
-# - YOUR_ADMOB_REWARDED_AD_UNIT_ID
-# - YOUR_ADMOB_INTERSTITIAL_AD_UNIT_ID
-# - YOUR_UNITY_GAME_ID
-
-# Build debug APK
-./gradlew assembleDebug
-
-# Run tests
-./gradlew test
-
-# Run lint + detekt
-./gradlew lint detekt
+./gradlew assembleDebug      # builds with Google test ad IDs, Firebase disabled
+./gradlew testDebugUnitTest  # unit tests
 ```
 
-### Configuration Files
+The app builds and runs **without** any keys:
+- Ads use Google's official test ad unit IDs.
+- Without `app/google-services.json`, Firebase plugins are skipped and login shows
+  "Firebase is not configured".
 
-| File | Purpose |
-|------|---------|
-| `local.properties` | SDK path (gitignored) |
-| `gradle.properties` | JVM args, caching, build config |
-| `gradle/libs.versions.toml` | Centralized dependency versions |
-| `app/src/main/res/values/strings.xml` | API keys, ad unit IDs |
-| `release.keystore` | Release signing (gitignored) |
+### Going to production
 
-## 🔑 Required API Keys
+| What | Where |
+|------|-------|
+| Firebase (Auth, Analytics, Crashlytics, FCM) | Create a Firebase project, enable Email/Password auth, put `google-services.json` in `app/` |
+| AdMob App ID | `./gradlew assembleRelease -PADMOB_APP_ID=ca-app-pub-xxx~yyy` (or edit `manifestPlaceholders` in `app/build.gradle.kts`) |
+| AdMob ad unit IDs | Debug: Google test IDs in `app/src/main/res/values/strings.xml`. Release: `app/src/release/res/values/ads.xml` (app open unit is still a TODO test ID) |
+| Unity Ads | No app config: add Unity as a **bidding** source in an AdMob mediation group (adapter `com.google.ads.mediation:unity`) |
+| Backend (optional) | `API_BASE_URL` in `app/build.gradle.kts`; all backend calls are best-effort |
+| Release signing | `release.keystore` in project root + `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` env vars or `keystore.properties` |
 
-Before building release, add these to `app/src/main/res/values/strings.xml`:
-
-```xml
-<!-- AdMob -->
-<string name="admob_app_id">ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX</string>
-<string name="admob_rewarded_ad_unit_id">ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX</string>
-<string name="admob_interstitial_ad_unit_id">ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX</string>
-<string name="admob_banner_ad_unit_id">ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX</string>
-
-<!-- Unity Ads / LevelPlay -->
-<string name="unity_game_id">XXXXXXXX</string>
-```
-
-And add `google-services.json` to `app/` for Firebase.
+### Ads strategy built in
+- **AdMob Mediation** is the only ad layer. Unity Ads joins as a **bidding** source via the AdMob adapter (Unity's waterfall placements were retired in Jan 2026); no Unity code or placement IDs live in the app.
+- **UMP consent** is requested on every launch; Mobile Ads is initialised and ads are loaded only when `canRequestAds()` is true. Settings shows **Privacy options** when UMP says they are required.
+- **Rewarded video** (main format) on Home: opt-in, grants reward points.
+- **Interstitial** only at natural breaks after a user action (leaving Home), max one per 2 user actions **and** at least 2 minutes apart; never on launch or exit.
+- **App open** ad when returning to the app from the background: max once per 4 hours, never on the first cold start, never before consent, never over another full-screen ad.
+- **Adaptive banner** in a fixed-height reserved slot at the bottom of Home, separated from buttons.
+- Rewarded and interstitial ads are preloaded and reloaded right after dismissal.
+- Debug builds always use Google test ad units; never click live ads.
 
 ## 🧪 Testing
 
@@ -202,7 +222,7 @@ com.example.myapplication
 │   ├── local/                    # Database, DataStore, DAOs
 │   ├── remote/                   # API service, DTOs, NetworkModule
 │   ├── repository/               # Repository implementations
-│   └── ads/                      # AdsManager (AdMob + Unity)
+│   └── ads/                      # AdsManager + AppOpenAdManager (AdMob Mediation)
 ├── domain/
 │   ├── model/                    # Domain entities
 │   ├── repository/               # Repository interfaces
@@ -230,23 +250,13 @@ Switch themes in Settings → Appearance → Theme (System/Light/Dark).
 
 ## 📊 Ads Integration
 
-### AdMob + Unity LevelPlay Bidding
+### AdMob Mediation + Unity Ads bidding
 
-The `AdsManager` implements **bidding mediation** (not waterfall):
-1. AdMob bidding (primary)
-2. Unity Ads bidding (fallback)
-3. Automatic preloading & refresh
-4. Rewarded, Interstitial, Banner support
-5. UMP consent for GDPR/CCPA
-
-### To Maximize eCPM:
-
-1. Enable **Bidding** in Unity Dashboard (not Waterfall)
-2. Add mediation networks: AppLovin, AdMob, ironSource, Vungle
-3. Set "Child-directed" = OFF in Unity Dashboard
-4. Implement GDPR consent (`setConsent(true)`)
-5. Use **Rewarded Video** at high-intent moments (revive, bonus, daily reward)
-6. Test on **real device** with `testMode = false`
+See "Ads strategy built in" above. Dashboard steps:
+1. AdMob: create GDPR and US-states messages (Privacy & messaging), and an App open ad unit (put its ID in `app/src/release/res/values/ads.xml`).
+2. Unity: create a project in "I will use Mediation → AdMob" mode and set the COPPA designation.
+3. AdMob: Mediation → mediation group per format → add **Unity Ads (bidding)**.
+4. Publish `app-ads.txt` (AdMob + Unity lines) on the developer website listed on Google Play.
 
 ## 🔒 Security
 

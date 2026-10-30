@@ -1,22 +1,22 @@
 package com.example.myapplication.data.remote
 
 import com.example.myapplication.domain.model.User
+import kotlinx.serialization.Serializable
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
-import retrofit2.http.Path
+import retrofit2.http.PUT
 
+/**
+ * Optional backend used to mirror the Firebase user. Every call is best-effort:
+ * the app keeps working with Firebase + Room when the backend is unreachable.
+ */
 interface ApiService {
 
-    @POST("auth/login")
-    suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
-
-    @POST("auth/register")
-    suspend fun register(@Body request: RegisterRequest): Response<RegisterResponse>
-
-    @POST("auth/refresh")
-    suspend fun refreshToken(@Body request: RefreshTokenRequest): Response<RefreshTokenResponse>
+    @POST("auth/sync")
+    suspend fun syncSession(@Body request: SessionSyncRequest): Response<UserProfileResponse>
 
     @POST("auth/logout")
     suspend fun logout(): Response<Unit>
@@ -24,64 +24,27 @@ interface ApiService {
     @GET("user/profile")
     suspend fun getProfile(): Response<UserProfileResponse>
 
-    @POST("user/profile")
+    @PUT("user/profile")
     suspend fun updateProfile(@Body request: UpdateProfileRequest): Response<UserProfileResponse>
 
-    @POST("user/delete")
+    @DELETE("user")
     suspend fun deleteAccount(): Response<Unit>
-
-    @POST("password/reset")
-    suspend fun requestPasswordReset(@Body request: PasswordResetRequest): Response<Unit>
 }
 
-data class LoginRequest(
-    val email: String,
-    val password: String,
+@Serializable
+data class SessionSyncRequest(
+    val user: User,
     val deviceId: String,
     val deviceName: String
 )
 
-data class LoginResponse(
-    val user: User,
-    val accessToken: String,
-    val refreshToken: String,
-    val expiresIn: Long
-)
-
-data class RegisterRequest(
-    val email: String,
-    val password: String,
-    val displayName: String,
-    val deviceId: String,
-    val deviceName: String
-)
-
-data class RegisterResponse(
-    val user: User,
-    val accessToken: String,
-    val refreshToken: String,
-    val expiresIn: Long
-)
-
-data class RefreshTokenRequest(
-    val refreshToken: String
-)
-
-data class RefreshTokenResponse(
-    val accessToken: String,
-    val refreshToken: String,
-    val expiresIn: Long
-)
-
+@Serializable
 data class UserProfileResponse(
     val user: User
 )
 
+@Serializable
 data class UpdateProfileRequest(
     val displayName: String?,
     val photoUrl: String?
-)
-
-data class PasswordResetRequest(
-    val email: String
 )

@@ -1,48 +1,25 @@
 package com.example.myapplication.presentation.navigation
 
-import androidx.navigation.NavHostController
+import com.example.myapplication.domain.quiz.QuizCategory
+import com.example.myapplication.domain.quiz.QuizMode
 
 sealed class Screen(val route: String) {
-    object Splash : Screen("splash")
-    object Login : Screen("login")
-    object Register : Screen("register")
-    object ForgotPassword : Screen("forgot_password")
-    object Home : Screen("home")
-    object Settings : Screen("settings")
-    object Profile : Screen("profile")
-}
+    data object Login : Screen("login")
+    data object Register : Screen("register")
+    data object ForgotPassword : Screen("forgot_password")
+    data object Home : Screen("home")
+    data object Settings : Screen("settings")
+    data object Profile : Screen("profile")
+    data object About : Screen("about")
+    data object Bookmarks : Screen("bookmarks")
+    data object Stats : Screen("stats")
 
-class AppNavigator(private val navController: NavHostController) {
-
-    fun navigateTo(screen: Screen) {
-        navController.navigate(screen.route) {
-            popUpTo(navController.graph.findStartDestination().id) {
-                saveState = true
-            }
-            launchSingleTop = true
-            restoreState = true
-        }
+    data object Quiz : Screen("quiz/{mode}?category={category}") {
+        fun create(mode: QuizMode, category: QuizCategory? = null): String =
+            "quiz/${mode.name}" + (category?.let { "?category=${it.name}" } ?: "")
     }
 
-    fun navigateTo(screen: Screen, args: Bundle) {
-        navController.navigate("${screen.route}?${args.toQueryString()}") {
-            popUpTo(navController.graph.findStartDestination().id) {
-                saveState = true
-            }
-            launchSingleTop = true
-            restoreState = true
-        }
+    data object Result : Screen("result/{attemptId}") {
+        fun create(attemptId: Long): String = "result/$attemptId"
     }
-
-    fun navigateUp() {
-        navController.navigateUp()
-    }
-
-    fun clearBackStack() {
-        navController.popBackStack(navController.graph.findStartDestination().id, false)
-    }
-}
-
-fun Bundle.toQueryString(): String {
-    return keySet().map { "$it=${getString(it)}" }.joinToString("&")
 }

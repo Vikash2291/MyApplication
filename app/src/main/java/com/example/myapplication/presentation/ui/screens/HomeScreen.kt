@@ -1,231 +1,153 @@
 package com.example.myapplication.presentation.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Bookmarks
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.myapplication.R
+import com.example.myapplication.domain.quiz.QuizCategory
+import com.example.myapplication.presentation.ui.components.AdaptiveBannerSlot
 import com.example.myapplication.presentation.ui.components.AppCard
+import com.example.myapplication.presentation.ui.components.AppTopBar
 import com.example.myapplication.presentation.ui.components.PrimaryButton
-import com.example.myapplication.presentation.ui.components.TopAppBar
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.filled.Info
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdSize
-import com.google.android.gms.ads.AdView
-import androidx.compose.ui.viewinterop.AndroidView
-import android.widget.FrameLayout
+import com.example.myapplication.presentation.ui.components.SectionHeader
+import com.example.myapplication.presentation.ui.components.icon
+import com.example.myapplication.presentation.ui.components.labelRes
+import com.example.myapplication.presentation.viewmodel.HomeUiState
 
 @Composable
 fun HomeScreen(
-    onRewardedAdClick: () -> Unit,
-    onInterstitialAdClick: () -> Unit,
-    onSettingsClick: () -> Unit,
+    uiState: HomeUiState,
+    snackbarHostState: SnackbarHostState,
+    onStartDaily: () -> Unit,
+    onStartCategory: (QuizCategory) -> Unit,
+    onWatchRewardedAd: () -> Unit,
+    onUnlockMega: () -> Unit,
+    onBookmarksClick: () -> Unit,
+    onStatsClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onHomeEvent: (com.example.myapplication.presentation.viewmodel.HomeEvent) -> Unit,
-    uiState: kotlinx.coroutines.flow.StateFlow<com.example.myapplication.presentation.viewmodel.HomeUiState>
+    onSettingsClick: () -> Unit,
+    onAboutClick: () -> Unit
 ) {
-    val state by uiState.collectAsState()
-    val authViewModel: com.example.myapplication.presentation.viewmodel.AuthViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Top App Bar
-            TopAppBar(
-                title = "Home",
+    Scaffold(
+        topBar = {
+            AppTopBar(
+                title = stringResource(R.string.home_title),
                 actions = {
+                    IconButton(onClick = onBookmarksClick) {
+                        Icon(Icons.Default.Bookmarks, contentDescription = stringResource(R.string.bookmarks_title))
+                    }
+                    IconButton(onClick = onStatsClick) {
+                        Icon(Icons.Default.BarChart, contentDescription = stringResource(R.string.stats_title))
+                    }
                     IconButton(onClick = onProfileClick) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "Profile")
+                        Icon(Icons.Default.AccountCircle, contentDescription = stringResource(R.string.profile_title))
                     }
                     IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title))
                     }
                 }
             )
-
-            // Content
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Welcome Card
-                AppCard {
-                    Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-                        authViewModel.uiState.collectAsState().value?.user?.let { user ->
-                            Text(
-                                text = "Welcome, ${user.displayName ?: user.email}!",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "Your personalized dashboard",
-                            fontSize = 16.sp,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            // Banner lives in a fixed-height slot at the very bottom, away from the play buttons.
+            if (uiState.showBanner && uiState.bannerAdUnitId.isNotBlank()) {
+                AdaptiveBannerSlot(uiState.bannerAdUnitId, collapsible = true)
+            }
+        }
+    ) { padding ->
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item(span = { GridItemSpan(maxLineSpan) }) { GreetingCard(uiState) }
+            item(span = { GridItemSpan(maxLineSpan) }) { DailyQuizCard(uiState.dailyCompletedToday, onStartDaily) }
+            item(span = { GridItemSpan(maxLineSpan) }) { MegaQuizCard(onUnlockMega) }
+            item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(R.string.home_categories)) }
+            items(QuizCategory.entries, key = { it.name }) { category ->
+                CategoryCard(category, uiState.questionCounts[category] ?: 0) { onStartCategory(category) }
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) { SectionHeader(stringResource(R.string.home_bonus_title)) }
+            item(span = { GridItemSpan(maxLineSpan) }) { BonusCard(uiState.isRewardedAdReady, onWatchRewardedAd) }
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    TextButton(onClick = onAboutClick) {
+                        Icon(Icons.Default.Info, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.about_title))
                     }
-                }
-
-                // Ad Actions Section
-                Text(
-                    text = "Monetization",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth().padding(start = 4.dp)
-                )
-
-                // Rewarded Ad Card
-                AppCard {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayCircle,
-                                    contentDescription = null,
-                                    tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
-                                Text(
-                                    text = "Rewarded Video",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "Watch a video to earn rewards",
-                                fontSize = 14.sp,
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        PrimaryButton(
-                            text = state.isRewardedAdReady?.let { if (it) "Ready" else "Loading..." } ?: "Load",
-                            onClick = onRewardedAdClick,
-                            modifier = Modifier.width(120.dp),
-                            enabled = state.isRewardedAdReady == true
-                        )
-                    }
-                }
-
-                // Interstitial Ad Card
-                AppCard {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.VideoLibrary,
-                                    contentDescription = null,
-                                    tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
-                                Text(
-                                    text = "Interstitial Ad",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "Full screen ad between content",
-                                fontSize = 14.sp,
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        PrimaryButton(
-                            text = state.isInterstitialAdReady?.let { if (it) "Ready" else "Loading..." } ?: "Load",
-                            onClick = onInterstitialAdClick,
-                            modifier = Modifier.width(120.dp),
-                            enabled = state.isInterstitialAdReady == true
-                        )
-                    }
-                }
-
-                // Features Section
-                Text(
-                    text = "Features",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth().padding(start = 4.dp).padding(top = 16.dp)
-                )
-
-                // Feature Grid
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    FeatureCard(
-                                        icon = Icons.Default.AttachMoney,
-                                        title = "In-App Purchases",
-                                        description = "Unlock premium features",
-                                        onClick = { /* TODO: Navigate to IAP screen */ }
-                                    )
-                                    FeatureCard(
-                                        icon = Icons.Default.Info,
-                                        title = "About App",
-                                        description = "Version info & licenses",
-                                        onClick = { /* TODO: Show about dialog */ }
-                                    )
                 }
             }
-            
-            // Banner Ad at bottom
-            Box(modifier = Modifier.fillMaxWidth()) {
-                AndroidView(
-                    factory = { ctx ->
-                        AdView(ctx).apply {
-                            adUnitId = ctx.getString(R.string.admob_banner_ad_unit_id)
-                            adSize = AdSize.BANNER
-                            layoutParams = FrameLayout.LayoutParams(
-                                FrameLayout.LayoutParams.MATCH_PARENT,
-                                FrameLayout.LayoutParams.WRAP_CONTENT
-                            )
-                            loadAd(AdRequest.Builder().build())
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                        .align(Alignment.BottomCenter)
+        }
+    }
+}
+
+@Composable
+private fun GreetingCard(uiState: HomeUiState) {
+    AppCard {
+        Column(Modifier.padding(20.dp)) {
+            val name = uiState.user?.displayName?.takeIf { it.isNotBlank() }
+            Text(
+                if (name != null) stringResource(R.string.home_greeting_name, name) else stringResource(R.string.home_greeting),
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(
+                    onClick = {},
+                    label = { Text(stringResource(R.string.points_value, uiState.rewardPoints)) },
+                    leadingIcon = { Icon(Icons.Default.Stars, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                )
+                AssistChip(
+                    onClick = {},
+                    label = { Text(pluralStringResource(R.plurals.streak_days, uiState.streak, uiState.streak)) },
+                    leadingIcon = { Icon(Icons.Default.LocalFireDepartment, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary) }
                 )
             }
         }
@@ -233,53 +155,119 @@ fun HomeScreen(
 }
 
 @Composable
-fun FeatureCard(
-    icon: ImageVector,
-    title: String,
-    description: String,
-    onClick: () -> Unit
-) {
-    AppCard(
-        modifier = Modifier.fillMaxWidth().fillMaxHeight(0.15f),
-        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp)
+private fun DailyQuizCard(completedToday: Boolean, onStart: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.size(48.dp),
-                contentAlignment = Alignment.Center
-            ) {
+        Column(Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = icon,
+                    if (completedToday) Icons.Default.CheckCircle else Icons.Default.Today,
                     contentDescription = null,
-                    tint = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.daily_quiz_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        stringResource(if (completedToday) R.string.daily_quiz_done else R.string.daily_quiz_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            PrimaryButton(
+                text = stringResource(if (completedToday) R.string.daily_quiz_replay else R.string.daily_quiz_play),
+                onClick = onStart,
+                icon = Icons.Default.PlayCircle,
+                modifier = Modifier.fillMaxWidth().testTag("daily_quiz_play")
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryCard(category: QuizCategory, questionCount: Int, onClick: () -> Unit) {
+    AppCard(onClick = onClick) {
+        Column(
+            Modifier.fillMaxWidth().padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(category.icon(), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(category.labelRes()),
+                style = MaterialTheme.typography.titleSmall,
+                textAlign = TextAlign.Center,
+                maxLines = 2
+            )
+            Text(
+                pluralStringResource(R.plurals.question_count, questionCount, questionCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun BonusCard(isReady: Boolean, onWatch: () -> Unit) {
+    AppCard {
+        Column(Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.PlayCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    stringResource(R.string.home_bonus_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
                 )
             }
-            androidx.compose.foundation.layout.Spacer(Modifier.width(16.dp))
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = title,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = description,
-                    fontSize = 14.sp,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Icon(
-                imageVector = Icons.Default.ArrowForwardIos,
-                contentDescription = null,
-                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.size(20.dp)
+            Spacer(Modifier.height(12.dp))
+            PrimaryButton(
+                text = stringResource(if (isReady) R.string.home_bonus_watch else R.string.video_loading),
+                onClick = onWatch,
+                enabled = isReady,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun MegaQuizCard(onUnlock: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Text(
+                stringResource(R.string.mega_quiz_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Text(
+                stringResource(R.string.mega_quiz_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Spacer(Modifier.height(16.dp))
+            PrimaryButton(
+                text = stringResource(R.string.mega_quiz_unlock),
+                onClick = onUnlock,
+                icon = Icons.Default.PlayCircle,
+                modifier = Modifier.fillMaxWidth().testTag("mega_quiz_unlock")
             )
         }
     }

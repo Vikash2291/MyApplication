@@ -2,124 +2,157 @@ package com.example.myapplication.di
 
 import android.content.Context
 import androidx.room.Room
-import com.example.myapplication.data.local.database.AppDatabase
-import com.example.myapplication.data.local.preferences.PreferencesRepository
-import com.example.myapplication.data.local.preferences.PreferencesRepositoryImpl
-import com.example.myapplication.data.remote.ApiService
-import com.example.myapplication.data.remote.NetworkModule
-import com.example.myapplication.data.repository.AuthRepository
-import com.example.myapplication.data.repository.AuthRepositoryImpl
-import com.example.myapplication.data.repository.UserRepository
-import com.example.myapplication.data.repository.UserRepositoryImpl
+import androidx.work.WorkManager
+import com.example.myapplication.BuildConfig
+import com.example.myapplication.core.common.Constants
 import com.example.myapplication.data.ads.AdsManager
 import com.example.myapplication.data.ads.AdsManagerImpl
-import com.example.myapplication.domain.repository.AuthRepository as DomainAuthRepository
-import com.example.myapplication.domain.repository.UserRepository as DomainUserRepository
-import com.example.myapplication.domain.usecase.GetCurrentUserUseCase
-import com.example.myapplication.domain.usecase.LoginUseCase
-import com.example.myapplication.domain.usecase.LogoutUseCase
-import com.example.myapplication.domain.usecase.RegisterUseCase
-import com.example.myapplication.presentation.viewmodel.AuthViewModel
-import com.example.myapplication.presentation.viewmodel.HomeViewModel
-import com.example.myapplication.presentation.viewmodel.SettingsViewModel
-import com.google.firebase.auth.FirebaseAuth
+import com.example.myapplication.data.auth.AuthDataSource
+import com.example.myapplication.data.auth.FirebaseAuthDataSource
+import com.example.myapplication.data.device.AndroidDeviceInfoProvider
+import com.example.myapplication.data.device.DeviceInfoProvider
+import com.example.myapplication.data.local.database.AppDatabase
+import com.example.myapplication.data.local.database.dao.QuizDao
+import com.example.myapplication.data.local.database.dao.SettingsDao
+import com.example.myapplication.data.local.database.dao.UserDao
+import com.example.myapplication.data.local.preferences.PreferencesRepository
+import com.example.myapplication.data.local.preferences.PreferencesRepositoryImpl
+import com.example.myapplication.data.quiz.AssetQuestionBankSource
+import com.example.myapplication.data.quiz.QuestionBankSource
+import com.example.myapplication.data.quiz.QuizRepositoryImpl
+import com.example.myapplication.data.remote.ApiService
+import com.example.myapplication.data.remote.AuthInterceptor
+import com.example.myapplication.data.repository.AuthRepositoryImpl
+import com.example.myapplication.data.repository.UserRepositoryImpl
+import com.example.myapplication.domain.quiz.QuizRepository
+import com.example.myapplication.domain.repository.AuthRepository
+import com.example.myapplication.domain.repository.UserRepository
+import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.components.ApplicationComponent
-import dagger.hilt.android.components.ActivityComponent
-import dagger.hilt.android.components.ActivityRetainedComponent
-import dagger.hilt.android.components.ViewModelComponent
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.android.scopes.ActivityRetainedScoped
-import dagger.hilt.android.scopes.Singleton
-import javax.inject.Inject
+import dagger.hilt.components.SingletonComponent
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
-@InstallIn(ApplicationComponent::class)
+@InstallIn(SingletonComponent::class)
 object AppModule {
 
     @Provides
     @Singleton
-    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        return Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "app_database"
-        )
+    fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
+        Room.databaseBuilder(context, AppDatabase::class.java, Constants.DATABASE_NAME)
             .fallbackToDestructiveMigration()
             .build()
-    }
+
+    @Provides
+    fun provideUserDao(db: AppDatabase): UserDao = db.userDao()
+
+    @Provides
+    fun provideSettingsDao(db: AppDatabase): SettingsDao = db.settingsDao()
+
+    @Provides
+    fun provideQuizDao(db: AppDatabase): QuizDao = db.quizDao()
 
     @Provides
     @Singleton
-    fun providePreferencesRepository(@ApplicationContext context: Context): PreferencesRepository {
-        return PreferencesRepositoryImpl(context)
-    }
-
-    @Provides
-    @Singleton
-    fun provideFirebaseAuth(): FirebaseAuth {
-        return FirebaseAuth.getInstance()
-    }
-
-    @Provides
-    @Singleton
-    fun provideApiService(): ApiService {
-        return NetworkModule.createApiService()
-    }
-
-    @Provides
-    @Singleton
-    fun provideAdsManager(@ApplicationContext context: Context, preferencesRepository: PreferencesRepository): AdsManager {
-        return AdsManagerImpl(context, preferencesRepository)
-    }
+    fun provideWorkManager(@ApplicationContext context: Context): WorkManager =
+        WorkManager.getInstance(context)
 }
 
 @Module
-@InstallIn(ApplicationComponent::class)
-abstract class RepositoryModule {
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
 
-    @Binds
-    @Singleton
-    abstract fun bindAuthRepository(impl: AuthRepositoryImpl): DomainAuthRepository
+    private const val TIMEOUT_SECONDS = 30L
 
-    @Binds
+    @Provides
     @Singleton
-    abstract fun bindUserRepository(impl: UserRepositoryImpl): DomainUserRepository
+    fun provideJson(): Json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+        explicitNulls = false
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient =
+        OkHttpClient.Builder()
+            .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            // No backend configured: fail every call locally before any data (token, email,
+            // device id) leaves the device. All ApiService callers treat failures as best-effort.
+            .addInterceptor { chain ->
+                if (!BuildConfig.BACKEND_ENABLED) throw IOException("Backend not configured")
+                chain.proceed(chain.request())
+            }
+            .addInterceptor(authInterceptor)
+            .addInterceptor(
+                HttpLoggingInterceptor().apply {
+                    level = if (BuildConfig.DEBUG) {
+                        HttpLoggingInterceptor.Level.BODY
+                    } else {
+                        HttpLoggingInterceptor.Level.NONE
+                    }
+                }
+            )
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideApiService(client: OkHttpClient, json: Json): ApiService =
+        Retrofit.Builder()
+            .baseUrl(BuildConfig.API_BASE_URL)
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+            .create(ApiService::class.java)
 }
 
 @Module
-@InstallIn(ViewModelComponent::class)
-abstract class UseCaseModule {
+@InstallIn(SingletonComponent::class)
+abstract class BindingsModule {
 
     @Binds
-    abstract fun bindLoginUseCase(impl: LoginUseCase): LoginUseCase
+    @Singleton
+    abstract fun bindPreferences(impl: PreferencesRepositoryImpl): PreferencesRepository
 
     @Binds
-    abstract fun bindRegisterUseCase(impl: RegisterUseCase): RegisterUseCase
+    @Singleton
+    abstract fun bindAuthDataSource(impl: FirebaseAuthDataSource): AuthDataSource
 
     @Binds
-    abstract fun bindLogoutUseCase(impl: LogoutUseCase): LogoutUseCase
+    @Singleton
+    abstract fun bindDeviceInfo(impl: AndroidDeviceInfoProvider): DeviceInfoProvider
 
     @Binds
-    abstract fun bindGetCurrentUserUseCase(impl: GetCurrentUserUseCase): GetCurrentUserUseCase
-}
-
-@Module
-@InstallIn(ActivityRetainedComponent::class)
-abstract class ViewModelModule {
+    @Singleton
+    abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
 
     @Binds
-    @ActivityRetainedScoped
-    abstract fun bindAuthViewModel(impl: AuthViewModel): AuthViewModel
+    @Singleton
+    abstract fun bindUserRepository(impl: UserRepositoryImpl): UserRepository
 
     @Binds
-    @ActivityRetainedScoped
-    abstract fun bindHomeViewModel(impl: HomeViewModel): HomeViewModel
+    @Singleton
+    abstract fun bindAdsManager(impl: AdsManagerImpl): AdsManager
 
     @Binds
-    @ActivityRetainedScoped
-    abstract fun bindSettingsViewModel(impl: SettingsViewModel): SettingsViewModel
+    @Singleton
+    abstract fun bindQuizRepository(impl: QuizRepositoryImpl): QuizRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindQuestionBankSource(impl: AssetQuestionBankSource): QuestionBankSource
 }

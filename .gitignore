@@ -1,122 +1,37 @@
 # Gradle
 .gradle/
 build/
-/*/build/
-/*/*/build/
-!**/src/main/**/build.gradle.kts
+**/build/
+.kotlin/
 
 # Local configuration
 local.properties
-*.properties
-!gradle.properties
-
-# Gradle wrapper jar (generated)
-gradle/wrapper/gradle-wrapper.jar
+keystore.properties
 
 # IDE
 .idea/
 *.iml
-*.iws
-*.ipr
-*.swp
-*.swo
-*~
 .vscode/
-*.code-workspace
-
-# OS
 .DS_Store
-Thumbs.db
 
 # Build outputs
 *.apk
 *.aab
 *.ap_
 *.dex
-*.class
-*.jar
-*.aar
-*.so
-*.o
-*.obj
-
-# Test outputs
-*.xml
-*.html
-*.json
-**/build/reports/
-**/build/test-results/
-**/build/outputs/
 
 # Signing
 *.keystore
 *.jks
-*.key
-*.p12
-*.pfx
-keystore.properties
-signing.properties
 
-# Firebase
-google-services.json
-google-services.json.backup
-
-# Crashlytics
-crashlytics.properties
-fabric.properties
-
-# AdMob/Unity
-*.admob
-*.unity
-
-# Kotlin
-*.kt.metadata
-*.kdoc
-
-# Compose
-compose-reports/
-
-# Detekt
-detekt-baseline.xml
-
-# Profiling
-*.hprof
-*.trace
-*.perf
+# Firebase config (add your own locally / via CI secret)
+# app/google-services.json  (committed: Firebase Android config is not secret; restrict API key by package+SHA in Google Cloud)
 
 # Logs
 *.log
-*.log.*
+*.hprof
+captures/
 
-# Backup
-*~
-*.bak
-*.backup
-
-# Temporary
-tmp/
-temp/
-*.tmp
-*.temp
-
-# Cache
-.cache/
-.caches/
-*.cache
-
-# Generated
-generated/
-**/generated/
-
-# Annotation processor
-apt_generated/
-kapt_generated/
-ksp_generated/
-
-# Coverage
-jacoco.exec
-coverage/
-
-# Release artifacts
-release/
-dist/
+# Python
+__pycache__/
+*.pyc

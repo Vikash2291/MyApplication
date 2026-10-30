@@ -1,235 +1,151 @@
 package com.example.myapplication.data.repository
 
-import com.example.myapplication.data.local.database.AppDatabase
-import com.example.myapplication.data.local.database.entity.UserEntity
+import com.example.myapplication.data.auth.AuthDataSource
+import com.example.myapplication.data.auth.AuthNotConfiguredException
+import com.example.myapplication.data.device.DeviceInfoProvider
+import com.example.myapplication.data.local.database.dao.UserDao
+import com.example.myapplication.data.local.database.entity.toDomain
+import com.example.myapplication.data.local.database.entity.toEntity
 import com.example.myapplication.data.local.preferences.PreferencesRepository
 import com.example.myapplication.data.remote.ApiService
+import com.example.myapplication.data.remote.SessionSyncRequest
+import com.example.myapplication.data.remote.UpdateProfileRequest
 import com.example.myapplication.domain.model.AuthResult
 import com.example.myapplication.domain.model.Result
 import com.example.myapplication.domain.model.User
 import com.example.myapplication.domain.repository.AuthRepository
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.auth.UserProfileChangeRequest
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
+private const val TOKEN_LIFETIME_SECONDS = 3600L
+
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
+    private val authDataSource: AuthDataSource,
     private val apiService: ApiService,
-    private val firebaseAuth: FirebaseAuth,
+    private val userDao: UserDao,
     private val preferencesRepository: PreferencesRepository,
-    private val database: AppDatabase
+    private val deviceInfo: DeviceInfoProvider
 ) : AuthRepository {
 
-    override suspend fun login(email: String, password: String): Result<AuthResult> {
-        return try {
-            // Try Firebase Auth first
-            val firebaseResult = firebaseAuth.signInWithEmailAndPassword(email, password).await()
-            val user = firebaseResult.user
-            val token = user.getIdToken(true).await().token
-            
-            // Get user profile from backend
-            val deviceId = getDeviceId()
-            val deviceName = android.os.Build.MODEL
-            val apiResponse = apiService.login(
-                com.example.myapplication.data.remote.LoginRequest(email, password, deviceId, deviceName)
-            )
-            
-            if (apiResponse.isSuccessful && apiResponse.body() != null) {
-                val body = apiResponse.body()!!
-                val authResult = AuthResult(
-                    user = body.user,
-                    accessToken = body.accessToken,
-                    refreshToken = body.refreshToken,
-                    expiresIn = body.expiresIn
-                )
-                
-                // Save to local
-                saveUserLocally(body.user, body.accessToken, body.refreshToken, body.expiresIn)
-                preferencesRepository.setLoggedIn(true).subscribe()
-                preferencesRepository.saveUserId(body.user.id).subscribe()
-                preferencesRepository.saveUserEmail(body.user.email).subscribe()
-                
-                Result.Success(authResult)
-            } else {
-                Result.Error(Exception("Login failed"), apiResponse.message() ?: "Unknown error")
-            }
-        } catch (e: Exception) {
-            Result.Error(e, e.message ?: "Login failed")
+    /** Firebase session drives sign-in state; Room supplies the cached profile. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override val currentUser: Flow<User?> = authDataSource.authState
+        .map { it?.id }
+        .distinctUntilChanged()
+        .flatMapLatest { id ->
+            if (id == null) flowOf(null)
+            else userDao.observeUser(id).map { it?.toDomain() ?: authDataSource.currentUser() }
         }
+
+    override suspend fun login(email: String, password: String): Result<AuthResult> = safeCall("Login failed") {
+        val user = authDataSource.signIn(email, password)
+        Result.Success(completeSession(user))
     }
 
-    override suspend fun register(email: String, password: String, displayName: String): Result<AuthResult> {
-        return try {
-            val firebaseResult = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
-            val user = firebaseResult.user
-            
-            // Update display name
-            val profileChangeRequest = UserProfileChangeRequest.Builder()
-                .setDisplayName(displayName)
-                .build()
-            user.updateProfile(profileChangeRequest).await()
-            
-            val token = user.getIdToken(true).await().token
-            
-            val deviceId = getDeviceId()
-            val deviceName = android.os.Build.MODEL
-            val apiResponse = apiService.register(
-                com.example.myapplication.data.remote.RegisterRequest(email, password, displayName, deviceId, deviceName)
-            )
-            
-            if (apiResponse.isSuccessful && apiResponse.body() != null) {
-                val body = apiResponse.body()!!
-                val authResult = AuthResult(
-                    user = body.user,
-                    accessToken = body.accessToken,
-                    refreshToken = body.refreshToken,
-                    expiresIn = body.expiresIn
-                )
-                
-                saveUserLocally(body.user, body.accessToken, body.refreshToken, body.expiresIn)
-                preferencesRepository.setLoggedIn(true).subscribe()
-                preferencesRepository.saveUserId(body.user.id).subscribe()
-                preferencesRepository.saveUserEmail(body.user.email).subscribe()
-                preferencesRepository.saveUserDisplayName(displayName).subscribe()
-                
-                Result.Success(authResult)
-            } else {
-                Result.Error(Exception("Registration failed"), apiResponse.message() ?: "Unknown error")
-            }
-        } catch (e: Exception) {
-            Result.Error(e, e.message ?: "Registration failed")
-        }
+    override suspend fun register(
+        email: String,
+        password: String,
+        displayName: String
+    ): Result<AuthResult> = safeCall("Registration failed") {
+        val user = authDataSource.signUp(email, password, displayName)
+        Result.Success(completeSession(user))
     }
 
-    override suspend fun logout(): Result<Unit> {
-        return try {
-            firebaseAuth.signOut()
-            apiService.logout().await()
-            
-            database.userDao().clearAllUsers()
-            preferencesRepository.clearAll().subscribe()
-            preferencesRepository.setLoggedIn(false).subscribe()
-            
+    override suspend fun logout(): Result<Unit> = safeCall("Logout failed") {
+        runCatching { apiService.logout() }
+        authDataSource.signOut()
+        userDao.clearAllUsers()
+        preferencesRepository.clearSession()
+        Result.Success(Unit)
+    }
+
+    override suspend fun getCurrentUser(): Result<User?> = safeCall("Failed to load user") {
+        val sessionUser = authDataSource.currentUser() ?: return@safeCall Result.Success(null)
+        val cached = userDao.getUserById(sessionUser.id)?.toDomain()
+        Result.Success(cached ?: sessionUser.also { userDao.insertUser(it.toEntity()) })
+    }
+
+    override suspend fun sendPasswordResetEmail(email: String): Result<Unit> =
+        safeCall("Failed to send reset email") {
+            authDataSource.sendPasswordReset(email)
             Result.Success(Unit)
-        } catch (e: Exception) {
-            Result.Error(e, e.message ?: "Logout failed")
         }
-    }
 
-    override suspend fun getCurrentUser(): Result<User?> {
-        return try {
-            val firebaseUser = firebaseAuth.currentUser
-            if (firebaseUser != null) {
-                val userEntity = database.userDao().getUserByIdSync(firebaseUser.uid)
-                if (userEntity != null) {
-                    val user = User(
-                        id = userEntity.id,
-                        email = userEntity.email,
-                        displayName = userEntity.displayName,
-                        photoUrl = userEntity.photoUrl,
-                        isEmailVerified = userEntity.isEmailVerified,
-                        createdAt = userEntity.createdAt,
-                        lastLoginAt = userEntity.lastLoginAt
-                    )
-                    Result.Success(user)
-                } else {
-                    // Fetch from backend
-                    val apiResponse = apiService.getProfile().await()
-                    if (apiResponse.isSuccessful && apiResponse.body() != null) {
-                        val user = apiResponse.body()!!.user
-                        saveUserLocally(user, "", null, 0)
-                        Result.Success(user)
-                    } else {
-                        Result.Success(null)
-                    }
-                }
-            } else {
-                Result.Success(null)
-            }
-        } catch (e: Exception) {
-            Result.Error(e, e.message ?: "Failed to get current user")
-        }
-    }
-
-    override suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
-        return try {
-            firebaseAuth.sendPasswordResetEmail(email).await()
-            apiService.requestPasswordReset(
-                com.example.myapplication.data.remote.PasswordResetRequest(email)
-            ).await()
+    override suspend fun sendEmailVerification(): Result<Unit> =
+        safeCall("Failed to send verification email") {
+            authDataSource.sendEmailVerification()
             Result.Success(Unit)
-        } catch (e: Exception) {
-            Result.Error(e, e.message ?: "Failed to send reset email")
         }
-    }
 
-    override suspend fun updateProfile(displayName: String?, photoUrl: String?): Result<User> {
-        return try {
-            val firebaseUser = firebaseAuth.currentUser ?: return Result.Error(Exception("No user logged in"), "No user")
-            
-            val profileChangeRequest = UserProfileChangeRequest.Builder()
-            displayName?.let { profileChangeRequest.setDisplayName(it) }
-            photoUrl?.let { profileChangeRequest.setPhotoUri(android.net.Uri.parse(it)) }
-            firebaseUser.updateProfile(profileChangeRequest.build()).await()
-            
-            val apiResponse = apiService.updateProfile(
-                com.example.myapplication.data.remote.UpdateProfileRequest(displayName, photoUrl)
-            ).await()
-            
-            if (apiResponse.isSuccessful && apiResponse.body() != null) {
-                val user = apiResponse.body()!!.user
-                updateUserLocally(user)
-                displayName?.let { preferencesRepository.saveUserDisplayName(it).subscribe() }
-                photoUrl?.let { preferencesRepository.saveUserPhotoUrl(it).subscribe() }
-                Result.Success(user)
-            } else {
-                Result.Error(Exception("Update failed"), apiResponse.message() ?: "Unknown error")
-            }
-        } catch (e: Exception) {
-            Result.Error(e, e.message ?: "Update failed")
+    override suspend fun updateProfile(displayName: String?, photoUrl: String?): Result<User> =
+        safeCall("Profile update failed") {
+            val updated = authDataSource.updateProfile(displayName, photoUrl)
+            runCatching { apiService.updateProfile(UpdateProfileRequest(displayName, photoUrl)) }
+            val existing = userDao.getUserById(updated.id)
+            userDao.insertUser(
+                updated.toEntity(
+                    accessToken = existing?.accessToken,
+                    refreshToken = existing?.refreshToken,
+                    tokenExpiresAt = existing?.tokenExpiresAt ?: 0L
+                )
+            )
+            Result.Success(updated)
         }
-    }
 
-    private suspend fun saveUserLocally(
-        user: User,
-        accessToken: String,
-        refreshToken: String?,
-        expiresIn: Long
-    ) {
-        val entity = UserEntity(
-            id = user.id,
-            email = user.email,
-            displayName = user.displayName,
-            photoUrl = user.photoUrl,
-            isEmailVerified = user.isEmailVerified,
-            createdAt = user.createdAt,
-            lastLoginAt = user.lastLoginAt,
-            accessToken = accessToken,
-            refreshToken = refreshToken,
-            tokenExpiresAt = System.currentTimeMillis() + (expiresIn * 1000)
+    private suspend fun completeSession(user: User): AuthResult {
+        val token = authDataSource.idToken(forceRefresh = true).orEmpty()
+        preferencesRepository.saveAuthToken(token)
+        userDao.insertUser(
+            user.toEntity(
+                accessToken = token,
+                tokenExpiresAt = System.currentTimeMillis() + TOKEN_LIFETIME_SECONDS * 1000
+            )
         )
-        database.userDao().insertUser(entity)
+        syncWithBackend(user)
+        return AuthResult(user = user, accessToken = token, expiresIn = TOKEN_LIFETIME_SECONDS)
     }
 
-    private suspend fun updateUserLocally(user: User) {
-        val existing = database.userDao().getUserByIdSync(user.id)
-        if (existing != null) {
-            val entity = existing.copy(
-                displayName = user.displayName,
-                photoUrl = user.photoUrl,
-                lastLoginAt = user.lastLoginAt
+    /** Best-effort mirror to the optional backend; failures never block sign-in. */
+    private suspend fun syncWithBackend(user: User) {
+        try {
+            val response = apiService.syncSession(
+                SessionSyncRequest(user, deviceInfo.deviceId, deviceInfo.deviceName)
             )
-            database.userDao().updateUser(entity)
+            response.body()?.user?.let { remote ->
+                userDao.insertUser(
+                    remote.copy(isEmailVerified = user.isEmailVerified).toEntity(
+                        accessToken = userDao.getUserById(user.id)?.accessToken
+                    )
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.d(e, "Backend sync skipped")
         }
     }
+}
 
-    private fun getDeviceId(): String {
-        return android.provider.Settings.Secure.getString(
-            context.contentResolver,
-            android.provider.Settings.Secure.ANDROID_ID
-        ) ?: "unknown"
-    }
+/** Runs [block], mapping any failure (except cancellation) to [Result.Error]. */
+internal suspend fun <T> safeCall(
+    fallbackMessage: String,
+    block: suspend () -> Result<T>
+): Result<T> = try {
+    block()
+} catch (e: CancellationException) {
+    throw e
+} catch (e: AuthNotConfiguredException) {
+    Result.Error(e.message ?: fallbackMessage, e)
+} catch (e: Exception) {
+    Timber.w(e, fallbackMessage)
+    Result.Error(e.localizedMessage ?: fallbackMessage, e)
 }

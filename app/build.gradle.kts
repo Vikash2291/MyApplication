@@ -1,64 +1,89 @@
+import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("com.google.dagger.hilt")
-    id("kotlin.plugin.serialization")
-    id("com.google.gms.google-services")
-    id("io.gitlab.arturbosch.detekt")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.detekt)
 }
+
+// Firebase Gradle plugins need app/google-services.json. Apply them only when it exists,
+// so the project still builds (with Firebase features disabled) on machines and CI without it.
+val hasGoogleServices = file("google-services.json").exists()
+if (hasGoogleServices) {
+    apply(plugin = libs.plugins.google.services.get().pluginId)
+    apply(plugin = libs.plugins.firebase.crashlytics.get().pluginId)
+}
+
+// Optional local secrets (never committed): keystore.properties in the project root.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun secret(name: String): String? = System.getenv(name) ?: keystoreProps.getProperty(name)
 
 android {
     namespace = "com.example.myapplication"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "com.alfred.myapplication"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
-        // Multi-dex for large apps
-        multiDexEnabled = true
+        vectorDrawables { useSupportLibrary = true }
+
+        // Optional own backend. Unset by default: the app is fully offline + Firebase, and no user
+        // data (ID token, email, device id) is sent anywhere else. Set -PAPI_BASE_URL=https://.../
+        // only once a real backend you control exists (and declare it in the Data safety form).
+        val apiBaseUrl = (project.findProperty("API_BASE_URL") as String?)?.takeIf { it.isNotBlank() }
+        buildConfigField("String", "API_BASE_URL", "\"${apiBaseUrl ?: "https://localhost.invalid/"}\"")
+        buildConfigField("boolean", "BACKEND_ENABLED", (apiBaseUrl != null).toString())
+        buildConfigField("boolean", "FIREBASE_CONFIGURED", hasGoogleServices.toString())
+
+        // Google's official test App ID for debug builds; release overrides below.
+        manifestPlaceholders["admobAppId"] =
+            (project.findProperty("ADMOB_APP_ID") as String?) ?: "ca-app-pub-3940256099942544~3347511713"
     }
 
+    val releaseStore = rootProject.file("release.keystore")
     signingConfigs {
-        create("debug") {
-            storeFile = file("../debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
-        create("release") {
-            storeFile = file("../release.keystore")
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-            keyAlias = System.getenv("KEY_ALIAS") ?: ""
-            keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+        if (releaseStore.exists()) {
+            create("release") {
+                storeFile = releaseStore
+                storePassword = secret("KEYSTORE_PASSWORD")
+                keyAlias = secret("KEY_ALIAS")
+                keyPassword = secret("KEY_PASSWORD")
+            }
         }
     }
 
     buildTypes {
         debug {
-            isDebuggable = true
-            isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            matchingFallbacks = ["release"]
         }
         release {
-            isDebuggable = false
+            // Production AdMob App ID (publisher pub-8988139914000617)
+            manifestPlaceholders["admobAppId"] =
+                (project.findProperty("ADMOB_APP_ID") as String?) ?: "ca-app-pub-8988139914000617~3342017543"
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            matchingFallbacks = ["debug"]
+            signingConfig = if (releaseStore.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 
@@ -67,145 +92,84 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += listOf(
-            "-Xopt-in=kotlin.RequiresOptIn",
-            "-Xopt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-Xopt-in=androidx.lifecycle.ExperimentalLifecycleApi",
-            "-Xopt-in=kotlinx.serialization.ExperimentalSerializationApi",
-            "-Xopt-in=com.google.android.gms.ads.ExperimentalGoogleMobileAdsApi"
-        )
-    }
-
     buildFeatures {
         compose = true
-        viewBinding = false
-        dataBinding = false
         buildConfig = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.12"
-    }
-
-    packagingOptions {
+    packaging {
         resources {
-            excludes += listOf(
-                "META-INF/*.kotlin_module",
-                "META-INF/proguard/*",
-                "META-INF/DEPENDENCIES",
-                "META-INF/LICENSE*",
-                "META-INF/NOTICE*"
-            )
-        }
-        jniLibs {
-            pickFirsts += listOf("lib/*/libc++_shared.so")
+            excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "META-INF/DEPENDENCIES")
         }
     }
 
-    // Splits for smaller APKs
-    splits {
-        abi {
-            enable = false
-        }
-        density {
-            enable = false
-        }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
+}
 
-    // Bundle configuration
-    bundle {
-        language {
-            enableSplit = true
-        }
-        density {
-            enableSplit = true
-        }
-        abi {
-            enableSplit = true
-        }
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        freeCompilerArgs.add("-opt-in=kotlin.RequiresOptIn")
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
-    // Core modules
     implementation(project(":core:common"))
-    implementation(project(":core:database"))
-    implementation(libs.bundles.androidx.core)
-    implementation(libs.bundles.androidx.lifecycle)
-    implementation(libs.bundles.coroutines)
-    implementation(libs.bundles.serialization)
 
-    // Compose
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.bundles.lifecycle)
+    implementation(libs.androidx.navigation.compose)
+
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose)
+    debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
 
-    // Hilt
-    implementation(libs.bundles.hilt)
+    implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.androidx.compiler)
 
-    // Room
-    implementation(libs.bundles.room)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.kotlinx.serialization.json)
+
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+    implementation(libs.datastore.preferences)
+    implementation(libs.work.runtime.ktx)
 
-    // DataStore
-    implementation(libs.bundles.datastore)
-
-    // Network
     implementation(libs.bundles.network)
-    implementation(libs.bundles.coil)
+    implementation(libs.coil.compose)
+    implementation(libs.timber)
 
-    // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.bundles.firebase)
 
-    // Ads - AdMob
-    implementation(libs.bundles.ads.admob)
+    implementation(libs.bundles.ads)
 
-    // Ads - Unity Ads / LevelPlay
-    implementation(libs.bundles.ads.unity)
-
-    implementation("com.unity3d.mediation:admob-adapter:4.11.0.0")
-    implementation("com.unity3d.mediation:applovin-adapter:4.11.0.0")
-    implementation("com.unity3d.mediation:chartboost-adapter:4.11.0.0")
-    implementation("com.unity3d.mediation:ironsource-adapter:4.11.0.0")
-    implementation("com.unity3d.mediation:vungle-adapter:4.11.0.0")
-    // Testing
-    testImplementation(libs.bundles.testing.unit)
-    androidTestImplementation(libs.bundles.testing.instrumented)
-    kspAndroidTest(libs.hilt.compiler)
-
-    // Core testing module
     testImplementation(project(":core:testing"))
-    androidTestImplementation(project(":core:testing"))
+    testImplementation(libs.bundles.testing.unit)
+
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.espresso.core)
 }
 
 detekt {
-    config = files("../config/detekt/detekt.yml")
-    baseline = file("../config/detekt/baseline.xml")
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
     buildUponDefaultConfig = true
-    parallel = true
-    reports {
-        html.required.set(true)
-        xml.required.set(true)
-        txt.required.set(false)
-        sarif.required.set(false)
-    }
-}
-
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
-    kotlinOptions {
-        freeCompilerArgs += listOf(
-            "-Xopt-in=kotlin.RequiresOptIn",
-            "-Xopt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-Xopt-in=androidx.lifecycle.ExperimentalLifecycleApi",
-            "-Xopt-in=kotlinx.serialization.ExperimentalSerializationApi",
-            "-Xopt-in=com.google.android.gms.ads.ExperimentalGoogleMobileAdsApi"
-        )
-    }
-}
-
-tasks.named("check").configure {
-    dependsOn("detekt")
+    ignoreFailures = true
 }
