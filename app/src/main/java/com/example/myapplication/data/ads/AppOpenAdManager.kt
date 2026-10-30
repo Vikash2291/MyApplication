@@ -9,6 +9,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.example.myapplication.R
+import com.example.myapplication.presentation.ui.MainActivity
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -114,10 +115,10 @@ class AppOpenAdManager @Inject constructor(
         loadAd()
     }
 
-    // Track the foreground activity; ignore the ad SDK's own activities.
+    // Only ever show over the app's own main screen: never over the ad SDKs' activities, the
+    // system/permission UI or any other host (e.g. test activities).
     override fun onActivityStarted(activity: Activity) {
-        val name = activity.javaClass.name
-        if (!name.startsWith("com.google.android.gms.ads") && !name.startsWith("com.unity3d.")) currentActivity = activity
+        if (activity is MainActivity) currentActivity = activity
     }
 
     override fun onActivityDestroyed(activity: Activity) {
