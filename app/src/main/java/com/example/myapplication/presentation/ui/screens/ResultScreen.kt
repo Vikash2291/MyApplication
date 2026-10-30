@@ -37,6 +37,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -116,7 +117,7 @@ fun ResultScreen(
                             text = stringResource(R.string.result_home),
                             onClick = onHome,
                             icon = Icons.Default.Home,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).testTag("result_home")
                         )
                     }
                 }

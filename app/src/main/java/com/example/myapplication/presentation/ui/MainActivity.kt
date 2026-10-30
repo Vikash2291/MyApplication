@@ -2,6 +2,7 @@ package com.example.myapplication.presentation.ui
 
 import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -16,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.lifecycleScope
@@ -56,7 +58,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         adsManager.gatherConsentAndInitialize(this)
-        requestNotificationPermissionIfNeeded()
+        // Only on a fresh launch, not on every rotation / language-change recreate.
+        if (savedInstanceState == null) requestNotificationPermissionIfNeeded()
 
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -96,7 +99,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }

@@ -230,7 +230,11 @@ class AdsManagerImpl @Inject constructor(
     // region Showing
 
     override fun showRewardedAd(activity: Activity, onResult: (RewardOutcome) -> Unit) {
-        if (fullScreenTracker.isShowing) return
+        // Always answer the caller: the quiz pauses its timer until it hears back.
+        if (fullScreenTracker.isShowing) {
+            onResult(RewardOutcome.Unavailable("Another ad is showing."))
+            return
+        }
         val ad = rewardedAd.takeIf { adsAllowed }
         if (ad == null) {
             preloadAds()

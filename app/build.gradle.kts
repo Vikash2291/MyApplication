@@ -39,7 +39,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 
-        buildConfigField("String", "API_BASE_URL", "\"https://api.example.com/\"")
+        // Optional own backend. Unset by default: the app is fully offline + Firebase, and no user
+        // data (ID token, email, device id) is sent anywhere else. Set -PAPI_BASE_URL=https://.../
+        // only once a real backend you control exists (and declare it in the Data safety form).
+        val apiBaseUrl = (project.findProperty("API_BASE_URL") as String?)?.takeIf { it.isNotBlank() }
+        buildConfigField("String", "API_BASE_URL", "\"${apiBaseUrl ?: "https://localhost.invalid/"}\"")
+        buildConfigField("boolean", "BACKEND_ENABLED", (apiBaseUrl != null).toString())
         buildConfigField("boolean", "FIREBASE_CONFIGURED", hasGoogleServices.toString())
 
         // Google's official test App ID for debug builds; release overrides below.
@@ -159,6 +164,7 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.espresso.core)
 }
 

@@ -39,6 +39,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
@@ -90,6 +91,12 @@ object NetworkModule {
             .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            // No backend configured: fail every call locally before any data (token, email,
+            // device id) leaves the device. All ApiService callers treat failures as best-effort.
+            .addInterceptor { chain ->
+                if (!BuildConfig.BACKEND_ENABLED) throw IOException("Backend not configured")
+                chain.proceed(chain.request())
+            }
             .addInterceptor(authInterceptor)
             .addInterceptor(
                 HttpLoggingInterceptor().apply {

@@ -41,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -237,7 +238,8 @@ private fun QuizContent(
                         text = option,
                         state = state,
                         enabled = !s.isAnswered && !s.isAdShowing,
-                        onClick = { onSelect(index) }
+                        onClick = { onSelect(index) },
+                        modifier = Modifier.testTag("option_$index")
                     )
                 }
             }
@@ -287,6 +289,7 @@ private fun QuizContent(
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(16.dp)
+                        .testTag("quiz_next")
                 )
             }
         }
