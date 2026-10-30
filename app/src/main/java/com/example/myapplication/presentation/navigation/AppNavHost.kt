@@ -1,6 +1,8 @@
 package com.example.myapplication.presentation.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.SnackbarHostState
+import com.example.myapplication.presentation.viewmodel.BannerViewModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -245,23 +247,26 @@ fun AppNavHost(
         }
 
         composable(Screen.Bookmarks.route) {
+            val backWithBreak = rememberBackWithBreak(navController)
             val vm: BookmarksViewModel = hiltViewModel()
             val state by vm.uiState.collectAsStateWithLifecycle()
             BookmarksScreen(
                 uiState = state,
                 onPractice = { startQuiz(QuizMode.BOOKMARKS) },
                 onRemove = vm::removeBookmark,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = backWithBreak
             )
         }
 
         composable(Screen.Stats.route) {
+            val backWithBreak = rememberBackWithBreak(navController)
             val vm: StatsViewModel = hiltViewModel()
             val state by vm.uiState.collectAsStateWithLifecycle()
-            StatsScreen(uiState = state, onBackClick = { navController.popBackStack() })
+            StatsScreen(uiState = state, onBackClick = backWithBreak)
         }
 
         composable(Screen.Profile.route) {
+            val backWithBreak = rememberBackWithBreak(navController)
             ProfileScreen(
                 uiState = authState,
                 snackbarHostState = snackbarHostState,
@@ -271,11 +276,12 @@ fun AppNavHost(
                 onDeleteAccount = { password -> authViewModel.deleteAccount(password) },
                 onCancelReauth = authViewModel::cancelReauth,
                 onSignInClick = { navController.navigate(Screen.Login.route) },
-                onBackClick = { navController.popBackStack() }
+                onBackClick = backWithBreak
             )
         }
 
         composable(Screen.Settings.route) {
+            val backWithBreak = rememberBackWithBreak(navController)
             val settingsViewModel: SettingsViewModel = hiltViewModel()
             val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
             val activity = rememberActivity()
@@ -300,12 +306,31 @@ fun AppNavHost(
                 onPrivacyOptionsClick = { activity?.let(settingsViewModel::openPrivacyOptions) },
                 onClearData = settingsViewModel::clearData,
                 onDeleteAccountClick = { navController.navigate(Screen.Profile.route) },
-                onBackClick = { navController.popBackStack() }
+                onBackClick = backWithBreak
             )
         }
 
         composable(Screen.About.route) {
-            AboutScreen(onBackClick = { navController.popBackStack() })
+            val backWithBreak = rememberBackWithBreak(navController)
+            AboutScreen(onBackClick = backWithBreak)
         }
     }
+}
+
+/**
+ * Back from a secondary screen to Home = natural break. Shows an interstitial only when the
+ * pacer allows (>= 2 user actions and >= 2 minutes since the last one); otherwise just goes back.
+ */
+@Composable
+private fun rememberBackWithBreak(navController: NavHostController): () -> Unit {
+    val bannerViewModel: BannerViewModel = hiltViewModel()
+    val activity = rememberActivity()
+    val back: () -> Unit = remember(navController, activity) {
+        {
+            val go = { navController.popBackStack(); Unit }
+            if (activity != null) bannerViewModel.onNaturalBreak(activity, go) else go()
+        }
+    }
+    BackHandler(onBack = back)
+    return back
 }

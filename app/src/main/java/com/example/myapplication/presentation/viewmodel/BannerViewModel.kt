@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.viewmodel
 
+import android.app.Activity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.ads.AdsManager
@@ -14,7 +15,7 @@ import javax.inject.Inject
 /** Shared banner state for secondary screens (bookmarks, stats, settings, about). */
 @HiltViewModel
 class BannerViewModel @Inject constructor(
-    adsManager: AdsManager,
+    private val adsManager: AdsManager,
     preferencesRepository: PreferencesRepository
 ) : ViewModel() {
     val adUnitId: String = adsManager.bannerAdUnitId
@@ -24,4 +25,8 @@ class BannerViewModel @Inject constructor(
         preferencesRepository.settings
     ) { ads, settings -> ads.canRequestAds && settings.adMobEnabled }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Leaving a secondary screen is a natural break; pacing decides if an interstitial fits. */
+    fun onNaturalBreak(activity: Activity, onContinue: () -> Unit) =
+        adsManager.onNaturalBreak(activity, onContinue)
 }
