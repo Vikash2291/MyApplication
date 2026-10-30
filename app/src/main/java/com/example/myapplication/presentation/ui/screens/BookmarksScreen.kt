@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.screens
 
+import com.example.myapplication.presentation.ui.components.AppBannerBar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,7 +43,10 @@ fun BookmarksScreen(
     onRemove: (String) -> Unit,
     onBackClick: () -> Unit
 ) {
-    Scaffold(topBar = { AppTopBar(stringResource(R.string.bookmarks_title), onNavigateUp = onBackClick) }) { padding ->
+    Scaffold(
+        topBar = { AppTopBar(stringResource(R.string.bookmarks_title), onNavigateUp = onBackClick) },
+        bottomBar = { AppBannerBar() }
+    ) { padding ->
         when {
             uiState.isLoading -> Box(Modifier.padding(padding)) { LoadingScreen() }
             uiState.questions.isEmpty() -> Box(Modifier.padding(padding)) {

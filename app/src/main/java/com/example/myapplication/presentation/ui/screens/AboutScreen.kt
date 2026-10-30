@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.screens
 
+import com.example.myapplication.presentation.ui.components.AppBannerBar
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +23,10 @@ import com.example.myapplication.presentation.ui.components.AppTopBar
 
 @Composable
 fun AboutScreen(onBackClick: () -> Unit) {
-    Scaffold(topBar = { AppTopBar(stringResource(R.string.about_title), onNavigateUp = onBackClick) }) { padding ->
+    Scaffold(
+        topBar = { AppTopBar(stringResource(R.string.about_title), onNavigateUp = onBackClick) },
+        bottomBar = { AppBannerBar() }
+    ) { padding ->
         Column(
             Modifier
                 .fillMaxSize()

@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.screens
 
+import com.example.myapplication.presentation.ui.components.AppBannerBar
 import com.example.myapplication.domain.quiz.AppLanguage
 import com.example.myapplication.R
 import androidx.compose.ui.res.stringResource
@@ -67,6 +68,7 @@ fun SettingsScreen(
 
     Scaffold(
         topBar = { AppTopBar(stringResource(R.string.settings_title), onNavigateUp = onBackClick) },
+        bottomBar = { AppBannerBar() },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(

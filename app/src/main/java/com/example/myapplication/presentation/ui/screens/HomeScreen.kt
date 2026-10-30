@@ -94,7 +94,7 @@ fun HomeScreen(
         bottomBar = {
             // Banner lives in a fixed-height slot at the very bottom, away from the play buttons.
             if (uiState.showBanner && uiState.bannerAdUnitId.isNotBlank()) {
-                AdaptiveBannerSlot(uiState.bannerAdUnitId)
+                AdaptiveBannerSlot(uiState.bannerAdUnitId, collapsible = true)
             }
         }
     ) { padding ->

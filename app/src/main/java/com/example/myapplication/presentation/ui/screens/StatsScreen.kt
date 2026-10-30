@@ -1,5 +1,6 @@
 package com.example.myapplication.presentation.ui.screens
 
+import com.example.myapplication.presentation.ui.components.AppBannerBar
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -41,7 +42,10 @@ import com.example.myapplication.presentation.viewmodel.StatsUiState
 @Composable
 fun StatsScreen(uiState: StatsUiState, onBackClick: () -> Unit) {
     val stats = uiState.stats
-    Scaffold(topBar = { AppTopBar(stringResource(R.string.stats_title), onNavigateUp = onBackClick) }) { padding ->
+    Scaffold(
+        topBar = { AppTopBar(stringResource(R.string.stats_title), onNavigateUp = onBackClick) },
+        bottomBar = { AppBannerBar() }
+    ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
